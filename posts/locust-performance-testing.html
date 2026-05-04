@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locust 实战：百万级并发性能测试实践 | PGH Blog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        .post-header { padding: 160px 24px 60px; background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.15) 0%, transparent 50%), var(--bg-primary); }
+        .post-container { max-width: 800px; margin: 0 auto; }
+        .post-title { font-size: 42px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; }
+        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+        .post-category { padding: 6px 16px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .post-date { color: var(--text-tertiary); font-size: 15px; }
+        .post-content { padding: 40px 24px 80px; }
+        .post-content h2 { font-size: 28px; font-weight: 600; margin: 40px 0 20px; color: var(--text-primary); }
+        .post-content h3 { font-size: 22px; font-weight: 600; margin: 32px 0 16px; color: var(--text-primary); }
+        .post-content p { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; font-size: 17px; }
+        .post-content ul { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
+        .post-content li { margin-bottom: 12px; font-size: 17px; }
+        .post-content code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #f59e0b; }
+        .post-content pre { background: var(--code-bg); padding: 24px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; }
+        .post-content pre code { background: none; padding: 0; color: #e2e8f0; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #f59e0b; text-decoration: none; font-weight: 500; margin-bottom: 32px; transition: transform 0.3s ease; }
+        .back-btn:hover { transform: translateX(-4px); }
+        @media (max-width: 768px) { .post-title { font-size: 32px; } }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" id="themeToggle">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line></svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </div>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="logo">PGH<span class="dot">.</span></a>
+            <ul class="nav-links"><li><a href="../index.html">首页</a></li><li><a href="../blog.html" class="active">博客</a></li><li><a href="../projects.html">项目</a></li><li><a href="../about.html">关于</a></li></ul>
+            <div class="hamburger"><span></span><span></span><span></span></div>
+        </div>
+    </nav>
+    <section class="post-header">
+        <div class="post-container">
+            <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
+            <h1 class="post-title">Locust 实战：百万级并发性能测试实践</h1>
+            <div class="post-meta"><span class="post-category">性能测试</span><span class="post-date">2023年12月20日</span></div>
+        </div>
+    </section>
+    <article class="post-content">
+        <div class="post-container">
+            <p>Locust 是一款用 Python 编写的现代性能测试工具，以其简洁的代码编写方式和出色的分布式能力受到越来越多开发者的青睐。本文将分享如何使用 Locust 进行百万级并发的性能测试实践。</p>
+            
+            <h2>一、为什么选择 Locust？</h2>
+            <ul>
+                <li><strong>代码即配置</strong>：用 Python 代码编写测试场景，比 JMeter 的 GUI 操作更灵活</li>
+                <li><strong>分布式支持</strong>：原生支持分布式压测，轻松扩展到多台机器</li>
+                <li><strong>实时监控</strong>：内置 Web UI，实时查看性能指标</li>
+                <li><strong>资源友好</strong>：基于协程，单台机器可模拟上万并发</li>
+            </ul>
+            
+            <h2>二、基础测试脚本</h2>
+            <pre><code class="language-python">from locust import HttpUser, task, between, events
+import random
+
+class WebsiteUser(HttpUser):
+    wait_time = between(1, 3)  # 用户思考时间 1-3 秒
+    
+    def on_start(self):
+        """每个虚拟用户启动时登录"""
+        self.client.post("/api/login", json={
+            "username": f"user_{random.randint(1000, 9999)}",
+            "password": "test123"
+        })
+    
+    @task(3)  # 权重为 3，更频繁执行
+    def view_dashboard(self):
+        self.client.get("/api/dashboard")
+    
+    @task(2)
+    def view_profile(self):
+        self.client.get("/api/profile")
+    
+    @task(1)
+    def update_profile(self):
+        self.client.patch("/api/profile", json={"nickname": "test_user"})</code></pre>
+            
+            <h2>三、分布式压测部署</h2>
+            <p>当单台机器不足以支撑所需并发时，可以使用分布式模式：</p>
+            <pre><code class="language-bash"># Master 节点
+locust -f locustfile.py --master --master-bind-host=0.0.0.0
+
+# Worker 节点（在多台机器上执行）
+locust -f locustfile.py --worker --master-host=<master-ip>
+</code></pre>
+            
+            <h2>四、性能指标分析</h2>
+            <p>重点关注以下核心指标：</p>
+            <ul>
+                <li><strong>响应时间</strong>：P50、P95、P99 分位数，而非平均值</li>
+                <li><strong>吞吐量（RPS）</strong>：每秒处理的请求数</li>
+                <li><strong>错误率</strong>：失败请求占比</li>
+                <li><strong>系统资源</strong>：CPU、内存、网络、磁盘 IO</li>
+            </ul>
+            
+            <h2>五、最佳实践</h2>
+            <ul>
+                <li>梯度加压，观察系统性能拐点</li>
+                <li>测试数据预生成，避免压测时的 IO 瓶颈</li>
+                <li>监控被测系统的各项指标，定位性能瓶颈</li>
+                <li>每次测试后清理数据，保证测试环境一致性</li>
+            </ul>
+            
+            <p style="margin-top: 40px; color: var(--text-tertiary); font-style: italic;">
+                性能测试不仅仅是为了得到一个数字，更重要的是理解系统的性能极限，找到瓶颈并持续优化。
+            </p>
+        </div>
+    </article>
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
+            </div>
+            <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>
+        </div>
+    </footer>
+    <script src="../script.js"></script>
+</body>
+</html>
