@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>博客 | PGH</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="theme-toggle" id="themeToggle">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+    </div>
+
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">PGH<span class="dot">.</span></a>
+            <ul class="nav-links">
+                <li><a href="index.html">首页</a></li>
+                <li><a href="blog.html" class="active">博客</a></li>
+                <li><a href="projects.html">项目</a></li>
+                <li><a href="about.html">关于</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="blog-page-header">
+        <h1 class="blog-page-title">技术博客</h1>
+        <p class="blog-page-subtitle">分享测试自动化、框架设计、质量保障的实践经验与思考</p>
+    </section>
+
+    <section class="blog-section">
+        <div class="container">
+            <div class="blog-filters">
+                <button class="filter-btn active">全部</button>
+                <button class="filter-btn">自动化测试</button>
+                <button class="filter-btn">框架设计</button>
+                <button class="filter-btn">性能测试</button>
+                <button class="filter-btn">最佳实践</button>
+            </div>
+
+            <div class="blog-grid">
+                <article class="blog-card">
+                    <div class="blog-image"></div>
+                    <div class="blog-content">
+                        <div class="blog-meta">
+                            <span class="blog-category">自动化测试</span>
+                            <span class="blog-date">2024年1月15日</span>
+                        </div>
+                        <h3 class="blog-title">Playwright vs Selenium: 2024年自动化测试工具对比</h3>
+                        <p class="blog-excerpt">
+                            深入对比两大主流自动化测试框架，从性能、稳定性、开发者体验等维度进行全面分析，帮你选择最适合的测试工具。
+                        </p>
+                        <a href="#" class="blog-read-more">阅读全文 →</a>
+                    </div>
+                </article>
+
+                <article class="blog-card">
+                    <div class="blog-image" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"></div>
+                    <div class="blog-content">
+                        <div class="blog-meta">
+                            <span class="blog-category">框架设计</span>
+                            <span class="blog-date">2024年1月8日</span>
+                        </div>
+                        <h3 class="blog-title">企业级 Pytest 自动化测试框架设计指南</h3>
+                        <p class="blog-excerpt">
+                            从零开始设计一个可扩展、易维护的自动化测试框架，包含 Fixture 设计、分层架构、报告集成等核心内容。
+                        </p>
+                        <a href="#" class="blog-read-more">阅读全文 →</a>
+                    </div>
+                </article>
+
+                <article class="blog-card">
+                    <div class="blog-image" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);"></div>
+                    <div class="blog-content">
+                        <div class="blog-meta">
+                            <span class="blog-category">性能测试</span>
+                            <span class="blog-date">2023年12月20日</span>
+                        </div>
+                        <h3 class="blog-title">Locust 实战：百万级并发性能测试实践</h3>
+                        <p class="blog-excerpt">
+                            使用 Locust 进行分布式性能测试，从零开始搭建测试环境、编写测试脚本、分析性能瓶颈的完整流程。
+                        </p>
+                        <a href="#" class="blog-read-more">阅读全文 →</a>
+                    </div>
+                </article>
+
+                <article class="blog-card">
+                    <div class="blog-image" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);"></div>
+                    <div class="blog-content">
+                        <div class="blog-meta">
+                            <span class="blog-category">最佳实践</span>
+                            <span class="blog-date">2023年12月10日</span>
+                        </div>
+                        <h3 class="blog-title">CI/CD 流水线中的自动化测试集成策略</h3>
+                        <p class="blog-excerpt">
+                            如何在 GitHub Actions、GitLab CI 中高效集成自动化测试，包括测试分层、并行执行、失败重试等优化技巧。
+                        </p>
+                        <a href="#" class="blog-read-more">阅读全文 →</a>
+                    </div>
+                </article>
+
+                <article class="blog-card">
+                    <div class="blog-image" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);"></div>
+                    <div class="blog-content">
+                        <div class="blog-meta">
+                            <span class="blog-category">SEO 测试</span>
+                            <span class="blog-date">2023年11月28日</span>
+                        </div>
+                        <h3 class="blog-title">自动化 SEO 测试：保障网站搜索引擎友好度</h3>
+                        <p class="blog-excerpt">
+                            构建自动化 SEO 测试套件，验证 Meta 标签、结构化数据、页面速度、移动端适配等关键 SEO 指标。
+                        </p>
+                        <a href="#" class="blog-read-more">阅读全文 →</a>
+                    </div>
+                </article>
+
+                <article class="blog-card">
+                    <div class="blog-image" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);"></div>
+                    <div class="blog-content">
+                        <div class="blog-meta">
+                            <span class="blog-category">测试左移</span>
+                            <span class="blog-date">2023年11月15日</span>
+                        </div>
+                        <h3 class="blog-title">测试左移实践：在开发阶段融入质量保障</h3>
+                        <p class="blog-excerpt">
+                            如何在开发流程的早期阶段引入测试，包括代码审查中的测试关注点、单元测试规范、集成测试前置等实践。
+                        </p>
+                        <a href="#" class="blog-read-more">阅读全文 →</a>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo">PGH<span class="dot">.</span></span>
+                    <p class="footer-tagline">用代码保障质量，用测试守护体验</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>导航</h4>
+                        <a href="index.html">首页</a>
+                        <a href="blog.html">博客</a>
+                        <a href="projects.html">项目</a>
+                        <a href="about.html">关于</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社交</h4>
+                        <a href="https://github.com/PGH11" target="_blank">GitHub</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2024 PGH. All rights reserved. Built with ❤️</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
