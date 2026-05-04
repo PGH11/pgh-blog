@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web 页面冷启动性能自动化测试实践 | PGH Blog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        .post-header { padding: 160px 24px 60px; background: radial-gradient(circle at 50% 0%, rgba(236, 72, 153, 0.15) 0%, transparent 50%), var(--bg-primary); }
+        .post-container { max-width: 800px; margin: 0 auto; }
+        .post-title { font-size: 42px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; }
+        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+        .post-category { padding: 6px 16px; background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); color: white; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .post-date { color: var(--text-tertiary); font-size: 15px; }
+        .post-content { padding: 40px 24px 80px; }
+        .post-content h2 { font-size: 28px; font-weight: 600; margin: 40px 0 20px; color: var(--text-primary); }
+        .post-content h3 { font-size: 22px; font-weight: 600; margin: 32px 0 16px; color: var(--text-primary); }
+        .post-content p { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; font-size: 17px; }
+        .post-content ul { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
+        .post-content li { margin-bottom: 12px; font-size: 17px; }
+        .post-content code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #ec4899; }
+        .post-content pre { background: var(--code-bg); padding: 24px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; }
+        .post-content pre code { background: none; padding: 0; color: #e2e8f0; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #ec4899; text-decoration: none; font-weight: 500; margin-bottom: 32px; transition: transform 0.3s ease; }
+        .back-btn:hover { transform: translateX(-4px); }
+        .metric-card { background: var(--bg-secondary); border-radius: 12px; padding: 20px; margin: 16px 0; }
+        .metric-card h4 { margin: 0 0 12px 0; color: var(--text-primary); }
+        @media (max-width: 768px) { .post-title { font-size: 32px; } }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" id="themeToggle">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line></svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </div>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="logo">PGH<span class="dot">.</span></a>
+            <ul class="nav-links"><li><a href="../index.html">首页</a></li><li><a href="../blog.html" class="active">博客</a></li><li><a href="../projects.html">项目</a></li><li><a href="../about.html">关于</a></li></ul>
+            <div class="hamburger"><span></span><span></span><span></span></div>
+        </div>
+    </nav>
+    <section class="post-header">
+        <div class="post-container">
+            <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
+            <h1 class="post-title">Web 页面冷启动性能自动化测试实践</h1>
+            <div class="post-meta"><span class="post-category">性能测试</span><span class="post-date">2026年1月20日</span></div>
+        </div>
+    </section>
+    <article class="post-content">
+        <div class="post-container">
+            <p>页面加载速度直接影响用户体验和 SEO 排名。但性能测试往往需要专业工具和复杂配置，难以集成到日常开发流程中。本文分享我基于 Performance API 开发的轻量级页面冷启动性能测试方案，让每个开发都能轻松做性能测试。</p>
+
+            <h2>一、为什么要做自动化性能测试？</h2>
+            
+            <p>性能问题往往是"温水煮青蛙"，在开发过程中不知不觉就变慢了：</p>
+            
+            <ul>
+                <li>引入一个新组件，页面加载时间增加了 200ms</li>
+                <li>新增第三方 SDK，阻塞了主线程</li>
+                <li>图片忘记压缩，首屏加载变慢</li>
+                <li>Webpack 配置变更，打包体积突然变大</li>
+            </ul>
+            
+            <p>等到上线后再发现性能退化，回滚成本很高。我们需要在每次提交时就能自动检测这些问题。</p>
+
+            <h2>二、核心性能指标</h2>
+            
+            <p>基于浏览器 Performance API，我们重点关注这些指标：</p>
+            
+            <div class="metric-card">
+                <h4>📊 关键性能指标</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>DOMContentLoaded</strong> - DOM 解析完成时间</li>
+                    <li><strong>Load</strong> - 页面所有资源加载完成时间</li>
+                    <li><strong>First Paint (FP)</strong> - 首次绘制时间</li>
+                    <li><strong>First Contentful Paint (FCP)</strong> - 首次内容绘制时间</li>
+                    <li><strong>Largest Contentful Paint (LCP)</strong> - 最大内容绘制时间</li>
+                    <li><strong>资源加载统计</strong> - JS/CSS/图片的数量和大小</li>
+                </ul>
+            </div>
+
+            <h2>三、Performance API 使用方法</h2>
+            
+            <pre><code class="language-javascript">// 在浏览器中执行获取性能数据
+function getPerformanceMetrics() {
+    const timing = performance.timing;
+    const navigation = performance.getEntriesByType('navigation')[0];
+    const paint = performance.getEntriesByType('paint');
+    const resources = performance.getEntriesByType('resource');
+    
+    return {
+        // 页面加载指标
+        domContentLoaded: timing.domContentLoadedEventEnd - timing.navigationStart,
+        loadComplete: timing.loadEventEnd - timing.navigationStart,
+        domReady: timing.domComplete - timing.navigationStart,
+        
+        // 绘制指标
+        firstPaint: paint.find(p => p.name === 'first-paint')?.startTime,
+        firstContentfulPaint: paint.find(p => p.name === 'first-contentful-paint')?.startTime,
+        
+        // 资源统计
+        resourceCount: resources.length,
+        totalTransferSize: resources.reduce((sum, r) => sum + (r.transferSize || 0), 0),
+        jsResources: resources.filter(r => r.initiatorType === 'script').length,
+        cssResources: resources.filter(r => r.initiatorType === 'css').length,
+        imageResources: resources.filter(r => r.initiatorType === 'img').length,
+        
+        // 慢资源列表（超过 1s）
+        slowResources: resources
+            .filter(r => r.duration > 1000)
+            .map(r => ({ name: r.name, duration: r.duration }))
+    };
+}</code></pre>
+
+            <h2>四、Python 自动化测试实现</h2>
+            
+            <p>使用 Playwright 控制浏览器，自动采集性能数据：</p>
+            
+            <pre><code class="language-python">from playwright.sync_api import sync_playwright
+import json
+import statistics
+
+class PerformanceTester:
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.results = []
+    
+    def test_single_page(self, path, runs=3):
+        """测试单个页面，多次运行取中位数"""
+        url = f"{self.base_url}{path}"
+        print(f"测试页面: {url} (运行 {runs} 次)")
+        
+        metrics_list = []
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=['--disable-cache', '--disable-extensions']  # 冷启动模式
+            )
+            
+            for i in range(runs):
+                # 每次都新建上下文，确保冷启动
+                context = browser.new_context()
+                page = context.new_page()
+                
+                # 禁用缓存
+                page.set_extra_http_headers({'Cache-Control': 'no-cache'})
+                
+                # 访问页面
+                page.goto(url, wait_until='load')
+                
+                # 等待 LCP 稳定
+                page.wait_for_timeout(2000)
+                
+                # 采集性能数据
+                metrics = page.evaluate("""() => {
+                    const timing = performance.timing;
+                    const paint = performance.getEntriesByType('paint');
+                    const resources = performance.getEntriesByType('resource');
+                    
+                    return {
+                        domContentLoaded: timing.domContentLoadedEventEnd - timing.navigationStart,
+                        loadComplete: timing.loadEventEnd - timing.navigationStart,
+                        firstPaint: paint.find(p => p.name === 'first-paint')?.startTime || 0,
+                        firstContentfulPaint: paint.find(p => p.name === 'first-contentful-paint')?.startTime || 0,
+                        resourceCount: resources.length,
+                        totalSize: resources.reduce((sum, r) => sum + (r.transferSize || 0), 0)
+                    };
+                }""")
+                
+                metrics_list.append(metrics)
+                print(f"  运行 {i+1}: FCP = {metrics['firstContentfulPaint']:.0f}ms")
+                
+                context.close()
+            
+            browser.close()
+        
+        # 计算中位数结果，消除抖动
+        result = {
+            'url': url,
+            'path': path,
+            'runs': runs,
+            'domContentLoaded': self._median([m['domContentLoaded'] for m in metrics_list]),
+            'loadComplete': self._median([m['loadComplete'] for m in metrics_list]),
+            'firstPaint': self._median([m['firstPaint'] for m in metrics_list]),
+            'firstContentfulPaint': self._median([m['firstContentfulPaint'] for m in metrics_list]),
+            'resourceCount': self._median([m['resourceCount'] for m in metrics_list]),
+        }
+        
+        self.results.append(result)
+        return result
+    
+    def _median(self, values):
+        """计算中位数"""
+        return statistics.median(sorted(values))
+    
+    def generate_report(self, output_file):
+        """生成性能报告"""
+        # 计算整体统计
+        all_fcp = [r['firstContentfulPaint'] for r in self.results]
+        
+        report = {
+            'summary': {
+                'total_pages': len(self.results),
+                'avg_fcp': sum(all_fcp) / len(all_fcp),
+                'max_fcp': max(all_fcp),
+                'min_fcp': min(all_fcp),
+            },
+            'pages': self.results,
+            'warnings': self._generate_warnings(),
+        }
+        
+        # 保存 JSON
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        
+        # 生成 HTML 报告
+        self._generate_html_report(report, output_file.replace('.json', '.html'))
+        
+        return report
+    
+    def _generate_warnings(self):
+        """生成性能告警"""
+        warnings = []
+        
+        for result in self.results:
+            if result['firstContentfulPaint'] > 2000:
+                warnings.append({
+                    'level': 'warning',
+                    'page': result['path'],
+                    'message': f"FCP 超过 2s: {result['firstContentfulPaint']:.0f}ms"
+                })
+            
+            if result['loadComplete'] > 5000:
+                warnings.append({
+                    'level': 'danger',
+                    'page': result['path'],
+                    'message': f"页面加载超过 5s: {result['loadComplete']:.0f}ms"
+                })
+        
+        return warnings</code></pre>
+
+            <h2>五、批量测试与基线对比</h2>
+            
+            <p>测试核心页面并与历史基线对比：</p>
+            
+            <pre><code class="language-python">def run_performance_test():
+    """运行完整性能测试"""
+    tester = PerformanceTester("https://example.com")
+    
+    # 核心页面列表
+    pages_to_test = [
+        '/',
+        '/products',
+        '/about',
+        '/contact',
+        '/blog',
+    ]
+    
+    print("开始性能测试...")
+    for path in pages_to_test:
+        tester.test_single_page(path, runs=3)
+    
+    # 生成报告
+    report = tester.generate_report('reports/performance.json')
+    
+    # 与基线对比
+    baseline = load_baseline()
+    if baseline:
+        compare_with_baseline(report, baseline)
+    
+    # 输出告警
+    if report['warnings']:
+        print("\n⚠️  发现性能问题:")
+        for w in report['warnings']:
+            print(f"  [{w['level']}] {w['page']}: {w['message']}")
+    else:
+        print("\n✅ 所有页面性能正常")
+    
+    # 如果有严重告警，返回非 0 退出码
+    has_danger = any(w['level'] == 'danger' for w in report['warnings'])
+    exit(1 if has_danger else 0)</code></pre>
+
+            <h2>六、CI 流水线集成</h2>
+            
+            <p>将性能测试集成到每次 PR 中：</p>
+            
+            <pre><code class="language-yaml"># .github/workflows/performance.yml
+name: 性能测试
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: 安装依赖
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+      
+      - name: 启动本地服务
+        run: |
+          npm run build
+          npm run preview -- --port 3000 &
+      
+      - name: 等待服务启动
+        run: npx wait-on http://localhost:3000
+      
+      - name: 运行性能测试
+        run: python scripts/performance_test.py
+      
+      - name: 上传性能报告
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: reports/</code></pre>
+
+            <h2>七、性能阈值配置</h2>
+            
+            <p>为每个页面设置合理的性能阈值：</p>
+            
+            <pre><code class="language-json">{
+  "thresholds": {
+    "firstContentfulPaint": 2000,
+    "largestContentfulPaint": 2500,
+    "totalBlockingTime": 200,
+    "cumulativeLayoutShift": 0.1
+  },
+  "pages": {
+    "/": { "fcp": 1500 },
+    "/products": { "fcp": 2000 },
+    "/blog/*": { "fcp": 2500 }
+  }
+}</code></pre>
+
+            <h2>八、常见问题与解决方案</h2>
+            
+            <h3>8.1 测试结果不稳定？</h3>
+            <p>性能测试结果有波动是正常的，建议：</p>
+            <ul>
+                <li>多次运行取中位数（3~5 次）</li>
+                <li>在 CI 中使用同一规格的机器执行</li>
+                <li>关闭浏览器缓存，模拟冷启动</li>
+                <li>排除第三方广告/统计脚本的干扰</li>
+            </ul>
+            
+            <h3>8.2 如何定位性能瓶颈？</h3>
+            <ul>
+                <li>用 Performance API 的 resource 数据，找出加载最慢的资源</li>
+                <li>用 Playwright 的 trace 功能录制完整的加载过程</li>
+                <li>集成 Lighthouse CI 获得更详细的优化建议</li>
+            </ul>
+
+            <h2>九、总结</h2>
+            
+            <p>这套自动化性能测试方案的优势：</p>
+            
+            <ul>
+                <li><strong>轻量级：</strong>无需复杂的性能测试平台，纯 Python 脚本即可实现</li>
+                <li><strong>标准化：</strong>基于浏览器标准 API，数据准确可靠</li>
+                <li><strong>易集成：</strong>轻松接入 CI 流水线，每次 PR 自动检测</li>
+                <li><strong>可扩展：</strong>可以轻松添加更多指标和检测规则</li>
+            </ul>
+            
+            <p>性能优化不是一次性的工作，而是需要持续关注。通过自动化性能测试，我们可以在开发阶段就发现性能退化问题，避免上线后再花几倍的时间去修复。</p>
+            
+            <p>完整的测试脚本可以在我的 <a href="https://github.com/PGH11/testing-skills" target="_blank" style="color: #ec4899;">testing-skills</a> GitHub 仓库中找到。</p>
+        </div>
+    </article>
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
+            </div>
+            <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>
+        </div>
+    </footer>
+    <script src="../script.js"></script>
+</body>
+</html>
