@@ -45,19 +45,19 @@
         <div class="post-container">
             <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
             <h1 class="post-title">Locust 实战：百万级并发性能测试实践</h1>
-            <div class="post-meta"><span class="post-category">性能测试</span><span class="post-date">2023年12月20日</span></div>
+            <div class="post-meta"><span class="post-category">性能测试</span><span class="post-date">2023�?2�?0�?/span></div>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
-            <p>Locust 是一款用 Python 编写的现代性能测试工具，以其简洁的代码编写方式和出色的分布式能力受到越来越多开发者的青睐。本文将分享如何使用 Locust 进行百万级并发的性能测试实践。</p>
+            <p>Locust 是一款用 Python 编写的现代性能测试工具，以其简洁的代码编写方式和出色的分布式能力受到越来越多开发者的青睐。本文将分享如何使用 Locust 进行百万级并发的性能测试实践�?/p>
             
-            <h2>一、为什么选择 Locust？</h2>
+            <h2>一、为什么选择 Locust�?/h2>
             <ul>
-                <li><strong>代码即配置</strong>：用 Python 代码编写测试场景，比 JMeter 的 GUI 操作更灵活</li>
-                <li><strong>分布式支持</strong>：原生支持分布式压测，轻松扩展到多台机器</li>
-                <li><strong>实时监控</strong>：内置 Web UI，实时查看性能指标</li>
-                <li><strong>资源友好</strong>：基于协程，单台机器可模拟上万并发</li>
+                <li><strong>代码即配�?/strong>：用 Python 代码编写测试场景，比 JMeter �?GUI 操作更灵�?/li>
+                <li><strong>分布式支�?/strong>：原生支持分布式压测，轻松扩展到多台机器</li>
+                <li><strong>实时监控</strong>：内�?Web UI，实时查看性能指标</li>
+                <li><strong>资源友好</strong>：基于协程，单台机器可模拟上万并�?/li>
             </ul>
             
             <h2>二、基础测试脚本</h2>
@@ -65,16 +65,16 @@
 import random
 
 class WebsiteUser(HttpUser):
-    wait_time = between(1, 3)  # 用户思考时间 1-3 秒
+    wait_time = between(1, 3)  # 用户思考时�?1-3 �?
     
     def on_start(self):
-        """每个虚拟用户启动时登录"""
+        """每个虚拟用户启动时登�?""
         self.client.post("/api/login", json={
             "username": f"user_{random.randint(1000, 9999)}",
             "password": "test123"
         })
     
-    @task(3)  # 权重为 3，更频繁执行
+    @task(3)  # 权重�?3，更频繁执行
     def view_dashboard(self):
         self.client.get("/api/dashboard")
     
@@ -96,31 +96,31 @@ locust -f locustfile.py --worker --master-host=<master-ip>
 </code></pre>
             
             <h2>四、性能指标分析</h2>
-            <p>重点关注以下核心指标：</p>
+            <p>重点关注以下核心指标�?/p>
             <ul>
-                <li><strong>响应时间</strong>：P50、P95、P99 分位数，而非平均值</li>
-                <li><strong>吞吐量（RPS）</strong>：每秒处理的请求数</li>
-                <li><strong>错误率</strong>：失败请求占比</li>
-                <li><strong>系统资源</strong>：CPU、内存、网络、磁盘 IO</li>
+                <li><strong>响应时间</strong>：P50、P95、P99 分位数，而非平均�?/li>
+                <li><strong>吞吐量（RPS�?/strong>：每秒处理的请求�?/li>
+                <li><strong>错误�?/strong>：失败请求占�?/li>
+                <li><strong>系统资源</strong>：CPU、内存、网络、磁�?IO</li>
             </ul>
             
-            <h2>五、最佳实践</h2>
+            <h2>五、最佳实�?/h2>
             <ul>
                 <li>梯度加压，观察系统性能拐点</li>
                 <li>测试数据预生成，避免压测时的 IO 瓶颈</li>
                 <li>监控被测系统的各项指标，定位性能瓶颈</li>
-                <li>每次测试后清理数据，保证测试环境一致性</li>
+                <li>每次测试后清理数据，保证测试环境一致�?/li>
             </ul>
             
             <p style="margin-top: 40px; color: var(--text-tertiary); font-style: italic;">
-                性能测试不仅仅是为了得到一个数字，更重要的是理解系统的性能极限，找到瓶颈并持续优化。
+                性能测试不仅仅是为了得到一个数字，更重要的是理解系统的性能极限，找到瓶颈并持续优化�?
             </p>
         </div>
     </article>
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体�?/p></div>
                 <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
             </div>
             <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>

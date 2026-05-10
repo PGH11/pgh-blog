@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python + Playwright：多语言 URL 违规内容自动检测实战 | PGH Blog</title>
+    <title>Python + Playwright：多语言 URL 违规内容自动检测实�?| PGH Blog</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -45,15 +45,15 @@
     <section class="post-header">
         <div class="post-container">
             <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
-            <h1 class="post-title">Python + Playwright：多语言 URL 违规内容自动检测实战</h1>
-            <div class="post-meta"><span class="post-category">自动化测试</span><span class="post-date">2026年1月25日</span></div>
+            <h1 class="post-title">Python + Playwright：多语言 URL 违规内容自动检测实�?/h1>
+            <div class="post-meta"><span class="post-category">自动化测�?/span><span class="post-date">2026�?�?5�?/span></div>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
-            <p>对于多语言站点来说，内容合规性是一个非常重要但也极其繁琐的测试点。手动检查 10 种语言 × 1000 个页面的违规内容？根本不可能。本文分享我基于 Playwright 开发的多线程 URL 内容扫描脚本，让违规内容检测完全自动化。</p>
+            <p>对于多语言站点来说，内容合规性是一个非常重要但也极其繁琐的测试点。手动检�?10 种语言 × 1000 个页面的违规内容？根本不可能。本文分享我基于 Playwright 开发的多线�?URL 内容扫描脚本，让违规内容检测完全自动化�?/p>
 
-            <h2>一、需求背景</h2>
+            <h2>一、需求背�?/h2>
             
             <p>在做国际站项目时，我们经常遇到以下合规性检查需求：</p>
             
@@ -62,49 +62,49 @@
                 <li>验证特定区域的法规合规性（GDPR、CCPA 等）</li>
                 <li>检查不同语言下的免责声明是否存在</li>
                 <li>验证价格、版权等信息是否完整</li>
-                <li>确保上线内容不包含测试数据或占位符</li>
+                <li>确保上线内容不包含测试数据或占位�?/li>
             </ul>
             
-            <p>当站点支持 10 种以上语言、有数千个页面时，人工检查是不现实的。我们需要一个自动化方案。</p>
+            <p>当站点支�?10 种以上语言、有数千个页面时，人工检查是不现实的。我们需要一个自动化方案�?/p>
 
             <h2>二、技术选型</h2>
             
-            <p>经过多次实践，我最终选择了以下技术栈：</p>
+            <p>经过多次实践，我最终选择了以下技术栈�?/p>
             
             <div class="code-box">
                 <strong>核心技术：</strong><br>
-                • Playwright - 浏览器自动化，支持多语言渲染<br>
-                • concurrent.futures - Python 原生多线程<br>
-                • BeautifulSoup - HTML 内容解析<br><br>
-                <strong>为什么选 Playwright？</strong><br>
-                • 支持多种语言的正确渲染<br>
-                • 能执行 JS，获取完整渲染后的页面内容<br>
-                • 自动等待页面加载，稳定性高<br>
-                • 多线程环境下表现良好
+                �?Playwright - 浏览器自动化，支持多语言渲染<br>
+                �?concurrent.futures - Python 原生多线�?br>
+                �?BeautifulSoup - HTML 内容解析<br><br>
+                <strong>为什么�?Playwright�?/strong><br>
+                �?支持多种语言的正确渲�?br>
+                �?能执�?JS，获取完整渲染后的页面内�?br>
+                �?自动等待页面加载，稳定性高<br>
+                �?多线程环境下表现良好
             </div>
 
             <h2>三、核心实现思路</h2>
             
-            <h3>3.1 从 Sitemap 提取 URL</h3>
+            <h3>3.1 �?Sitemap 提取 URL</h3>
             
-            <p>首先需要获取站点的所有页面 URL。使用 sitemap.xml 是最标准的方式：</p>
+            <p>首先需要获取站点的所有页�?URL。使�?sitemap.xml 是最标准的方式：</p>
             
             <pre><code class="language-python">import requests
 from xml.etree import ElementTree
 
 def extract_urls_from_sitemap(sitemap_url):
-    """从 sitemap.xml 提取所有 URL"""
+    """�?sitemap.xml 提取所�?URL"""
     response = requests.get(sitemap_url)
     root = ElementTree.fromstring(response.content)
     
-    # 处理 sitemap 嵌套的情况
+    # 处理 sitemap 嵌套的情�?
     namespaces = {'sm': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
     urls = []
     
     # 检查是否是 sitemap index
     sitemap_tags = root.findall('sm:sitemap', namespaces)
     if sitemap_tags:
-        # 递归提取子 sitemap
+        # 递归提取�?sitemap
         for sitemap in sitemap_tags:
             loc = sitemap.find('sm:loc', namespaces).text
             urls.extend(extract_urls_from_sitemap(loc))
@@ -116,7 +116,7 @@ def extract_urls_from_sitemap(sitemap_url):
     
     return urls</code></pre>
             
-            <p>这个函数支持 sitemap 嵌套，对于大型站点特别有用。提取完成后可以导出为 JSON 文件。</p>
+            <p>这个函数支持 sitemap 嵌套，对于大型站点特别有用。提取完成后可以导出�?JSON 文件�?/p>
 
             <h3>3.2 违规词检测核心逻辑</h3>
             
@@ -125,7 +125,7 @@ def extract_urls_from_sitemap(sitemap_url):
         self.keywords = violation_keywords
         
     def check_page(self, page_content):
-        """检查页面是否包含违规内容"""
+        """检查页面是否包含违规内�?""
         violations = []
         
         for keyword in self.keywords:
@@ -135,11 +135,11 @@ def extract_urls_from_sitemap(sitemap_url):
         return violations
     
     def check_xpath_element(self, page, xpath, expected_texts):
-        """检查特定 XPath 元素是否包含预期文本"""
+        """检查特�?XPath 元素是否包含预期文本"""
         try:
             element = page.locator(xpath)
             if element.count() == 0:
-                return ["元素不存在"]
+                return ["元素不存�?]
             
             text = element.inner_text()
             violations = []
@@ -149,11 +149,11 @@ def extract_urls_from_sitemap(sitemap_url):
             
             return violations
         except Exception as e:
-            return [f"检查失败: {str(e)}"]</code></pre>
+            return [f"检查失�? {str(e)}"]</code></pre>
 
-            <h3>3.3 多线程并发扫描</h3>
+            <h3>3.3 多线程并发扫�?/h3>
             
-            <p>单线程扫描太慢了，1000 个页面可能要跑半小时。使用多线程可以大幅提升速度：</p>
+            <p>单线程扫描太慢了�?000 个页面可能要跑半小时。使用多线程可以大幅提升速度�?/p>
             
             <pre><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
 from playwright.sync_api import sync_playwright
@@ -171,7 +171,7 @@ def scan_single_url(url, checker):
             # 获取页面完整内容
             content = page.content()
             
-            # 检查违规内容
+            # 检查违规内�?
             violations = checker.check_page(content)
             
             return {
@@ -207,9 +207,9 @@ def batch_scan(urls, max_workers=5):
             try:
                 result = future.result()
                 results.append(result)
-                print(f"✅ {url} - 发现 {result['violation_count']} 个违规")
+                print(f"�?{url} - 发现 {result['violation_count']} 个违�?)
             except Exception as e:
-                print(f"❌ {url} - 扫描失败: {e}")
+                print(f"�?{url} - 扫描失败: {e}")
                 results.append({
                     'url': url, 
                     'status': 'exception', 
@@ -223,7 +223,7 @@ def batch_scan(urls, max_workers=5):
             <p>扫描完成后，生成清晰的检测报告：</p>
             
             <pre><code class="language-python">def generate_report(results, output_file):
-    """生成 HTML 检测报告"""
+    """生成 HTML 检测报�?""
     
     # 统计数据
     total = len(results)
@@ -234,7 +234,7 @@ def batch_scan(urls, max_workers=5):
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>违规内容检测报告</title>
+        <title>违规内容检测报�?/title>
         <style>
             body {{ font-family: -apple-system, sans-serif; padding: 40px; }}
             .stats {{ display: flex; gap: 20px; margin-bottom: 40px; }}
@@ -245,9 +245,9 @@ def batch_scan(urls, max_workers=5):
         </style>
     </head>
     <body>
-        <h1>违规内容检测报告</h1>
+        <h1>违规内容检测报�?/h1>
         <div class="stats">
-            <div class="stat-card"><strong>总 URL 数:</strong> {total}</div>
+            <div class="stat-card"><strong>�?URL �?</strong> {total}</div>
             <div class="stat-card"><strong>扫描成功:</strong> {success}</div>
             <div class="stat-card" class="violation"><strong>发现违规:</strong> {has_violation}</div>
         </div>
@@ -264,9 +264,9 @@ def batch_scan(urls, max_workers=5):
             <p>对于多语言站点，需要额外处理：</p>
             
             <ol>
-                <li>按语言分组扫描，不同语言使用不同的违规词表</li>
+                <li>按语言分组扫描，不同语言使用不同的违规词�?/li>
                 <li>检测语言切换功能是否正常工作</li>
-                <li>验证特定语言下必须存在的合规文案（如免责声明）</li>
+                <li>验证特定语言下必须存在的合规文案（如免责声明�?/li>
             </ol>
             
             <pre><code class="language-python">def scan_multilingual(base_url, languages, checker):
@@ -275,9 +275,9 @@ def batch_scan(urls, max_workers=5):
     
     for lang in languages:
         lang_url = f"{base_url}/{lang}/"
-        print(f"开始扫描 {lang} 语言版本...")
+        print(f"开始扫�?{lang} 语言版本...")
         
-        # 提取该语言的 sitemap URL
+        # 提取该语言�?sitemap URL
         sitemap_url = f"{base_url}/{lang}/sitemap.xml"
         urls = extract_urls_from_sitemap(sitemap_url)
         
@@ -287,22 +287,22 @@ def batch_scan(urls, max_workers=5):
         
         # 输出该语言统计
         violations = sum(r.get('violation_count', 0) for r in lang_results)
-        print(f"{lang} 完成: 发现 {violations} 个违规")
+        print(f"{lang} 完成: 发现 {violations} 个违�?)
     
     return results</code></pre>
 
-            <h2>五、最佳实践</h2>
+            <h2>五、最佳实�?/h2>
             
             <h3>5.1 并发控制</h3>
-            <p>线程数不是越大越好！建议：</p>
+            <p>线程数不是越大越好！建议�?/p>
             <ul>
-                <li>生产环境：3~5 个线程</li>
-                <li>测试环境：5~8 个线程</li>
+                <li>生产环境�?~5 个线�?/li>
+                <li>测试环境�?~8 个线�?/li>
                 <li>避免给服务器造成过大压力</li>
             </ul>
             
             <h3>5.2 错误重试</h3>
-            <p>网络波动是正常的，给每个 URL 增加重试机制：</p>
+            <p>网络波动是正常的，给每个 URL 增加重试机制�?/p>
             <pre><code class="language-python">def scan_with_retry(url, checker, max_retries=3):
     for attempt in range(max_retries):
         try:
@@ -311,13 +311,13 @@ def batch_scan(urls, max_workers=5):
             if attempt == max_retries - 1:
                 raise
             print(f"重试 {attempt + 1}/{max_retries}: {url}")
-            time.sleep(2 ** attempt)  # 指数退避</code></pre>
+            time.sleep(2 ** attempt)  # 指数退�?/code></pre>
             
             <h3>5.3 增量扫描</h3>
-            <p>不要每次都全量扫描！记录上次扫描时间，只扫描新增或变更的页面：</p>
+            <p>不要每次都全量扫描！记录上次扫描时间，只扫描新增或变更的页面�?/p>
             <pre><code class="language-python">def get_urls_to_scan(all_urls, last_scan_time):
     """获取需要扫描的 URL 列表（增量扫描）"""
-    # 这里可以对接 CMS API，获取页面最后更新时间
+    # 这里可以对接 CMS API，获取页面最后更新时�?
     # 或者简单地每次随机抽样扫描
     
     import random
@@ -326,14 +326,14 @@ def batch_scan(urls, max_workers=5):
 
             <h2>六、与 CI/CD 集成</h2>
             
-            <p>将违规内容检查集成到发布流水线中：</p>
+            <p>将违规内容检查集成到发布流水线中�?/p>
             
             <pre><code class="language-yaml"># .github/workflows/violation-check.yml
-name: 违规内容检查
+name: 违规内容检�?
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 每天凌晨 2 点执行
+    - cron: '0 2 * * *'  # 每天凌晨 2 点执�?
   workflow_dispatch:      # 支持手动触发
 
 jobs:
@@ -360,43 +360,43 @@ jobs:
           name: violation-report
           path: reports/violation-report.html
       
-      - name: 发现违规时告警
+      - name: 发现违规时告�?
         if: failure()
         run: |
-          # 发送 Slack/邮件通知
-          echo "发现违规内容，请查看报告！"</code></pre>
+          # 发�?Slack/邮件通知
+          echo "发现违规内容，请查看报告�?</code></pre>
 
-            <h2>七、实际效果</h2>
+            <h2>七、实际效�?/h2>
             
             <p>使用这套方案后，我们的测试效率有了质的飞跃：</p>
             
             <ul>
-                <li><strong>覆盖范围：</strong>从只能抽检 10 个页面 → 全量扫描 1000+ 页面</li>
-                <li><strong>执行时间：</strong>从 2 人天 → 30 分钟自动完成</li>
-                <li><strong>发现问题：</strong>上线后累计发现 50+ 人工漏测的合规性问题</li>
-                <li><strong>回归成本：</strong>每次发布回归时间从 4 小时 → 0</li>
+                <li><strong>覆盖范围�?/strong>从只能抽检 10 个页�?�?全量扫描 1000+ 页面</li>
+                <li><strong>执行时间�?/strong>�?2 人天 �?30 分钟自动完成</li>
+                <li><strong>发现问题�?/strong>上线后累计发�?50+ 人工漏测的合规性问�?/li>
+                <li><strong>回归成本�?/strong>每次发布回归时间�?4 小时 �?0</li>
             </ul>
 
-            <h2>八、进阶优化方向</h2>
+            <h2>八、进阶优化方�?/h2>
             
             <ul>
-                <li><strong>AI 语义检测：</strong>接入 OpenAI API，不仅仅是关键词匹配，而是语义层面的合规检查</li>
-                <li><strong>图片 OCR：</strong>对页面中的图片也进行违规内容检测</li>
-                <li><strong>历史对比：</strong>对比两次扫描结果，只报告新增的违规项</li>
+                <li><strong>AI 语义检测：</strong>接入 OpenAI API，不仅仅是关键词匹配，而是语义层面的合规检�?/li>
+                <li><strong>图片 OCR�?/strong>对页面中的图片也进行违规内容检�?/li>
+                <li><strong>历史对比�?/strong>对比两次扫描结果，只报告新增的违规项</li>
                 <li><strong>自定义规则引擎：</strong>支持更复杂的合规规则配置</li>
             </ul>
 
             <h2>总结</h2>
             
-            <p>内容合规性检测是一个容易被忽略但风险很高的测试领域。通过 Playwright + Python 多线程的方案，我们可以将繁琐的人工检查转变为高效、可靠的自动化流程。</p>
+            <p>内容合规性检测是一个容易被忽略但风险很高的测试领域。通过 Playwright + Python 多线程的方案，我们可以将繁琐的人工检查转变为高效、可靠的自动化流程�?/p>
             
-            <p>完整的脚本代码可以在我的 <a href="https://github.com/PGH11/testing-skills" target="_blank" style="color: #f97316;">testing-skills</a> GitHub 仓库中找到。</p>
+            <p>完整的脚本代码可以在我的 <a href="https://github.com/PGH11/testing-skills" target="_blank" style="color: #f97316;">testing-skills</a> GitHub 仓库中找到�?/p>
         </div>
     </article>
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体�?/p></div>
                 <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
             </div>
             <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>

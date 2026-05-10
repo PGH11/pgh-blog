@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自动化 SEO 测试：保障网站搜索引擎友好度 | PGH Blog</title>
+    <title>自动�?SEO 测试：保障网站搜索引擎友好度 | PGH Blog</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -44,21 +44,21 @@
     <section class="post-header">
         <div class="post-container">
             <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
-            <h1 class="post-title">自动化 SEO 测试：保障网站搜索引擎友好度</h1>
-            <div class="post-meta"><span class="post-category">SEO 测试</span><span class="post-date">2023年11月28日</span></div>
+            <h1 class="post-title">自动�?SEO 测试：保障网站搜索引擎友好度</h1>
+            <div class="post-meta"><span class="post-category">SEO 测试</span><span class="post-date">2023�?1�?8�?/span></div>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
-            <p>SEO（搜索引擎优化）对于网站的流量至关重要，但在开发过程中很容易被忽略。本文将介绍如何构建自动化 SEO 测试套件，在每次发布前自动验证网站的 SEO 指标，避免因代码变更导致 SEO 排名下降。</p>
+            <p>SEO（搜索引擎优化）对于网站的流量至关重要，但在开发过程中很容易被忽略。本文将介绍如何构建自动�?SEO 测试套件，在每次发布前自动验证网站的 SEO 指标，避免因代码变更导致 SEO 排名下降�?/p>
             
             <h2>一、需要验证的核心 SEO 指标</h2>
             <ul>
                 <li><strong>Meta 标签</strong>：title、description、keywords、og 系列标签</li>
-                <li><strong>结构化数据</strong>：JSON-LD、Microdata 格式验证</li>
-                <li><strong>页面速度</strong>：Lighthouse 性能评分、核心 Web 指标</li>
-                <li><strong>移动端适配</strong>：响应式布局、触摸元素大小</li>
-                <li><strong>可访问性</strong>：图片 alt 文本、语义化标签</li>
+                <li><strong>结构化数�?/strong>：JSON-LD、Microdata 格式验证</li>
+                <li><strong>页面速度</strong>：Lighthouse 性能评分、核�?Web 指标</li>
+                <li><strong>移动端适配</strong>：响应式布局、触摸元素大�?/li>
+                <li><strong>可访问�?/strong>：图�?alt 文本、语义化标签</li>
                 <li><strong>链接健康</strong>：无死链、无重定向链</li>
             </ul>
             
@@ -68,7 +68,7 @@ from playwright.sync_api import Page
 
 class TestSEOBasics:
     def test_page_has_valid_title(self, page: Page):
-        """测试：页面有有效的 title 标签"""
+        """测试：页面有有效�?title 标签"""
         page.goto("/")
         title = page.title()
         
@@ -82,10 +82,10 @@ class TestSEOBasics:
         desc = page.locator('meta[name="description"]').get_attribute("content")
         
         assert desc, "页面没有 meta description"
-        assert 50 <= len(desc) <= 160, f"description 长度不合规: {len(desc)}"
+        assert 50 <= len(desc) <= 160, f"description 长度不合�? {len(desc)}"
     
     def test_images_have_alt_text(self, page: Page):
-        """测试：所有图片都有 alt 文本"""
+        """测试：所有图片都�?alt 文本"""
         page.goto("/")
         images = page.locator("img").all()
         
@@ -100,7 +100,7 @@ class TestSEOBasics:
             f"以下图片缺少 alt 文本: {images_without_alt}"
     
     def test_no_broken_links(self, page: Page):
-        """测试：页面没有死链"""
+        """测试：页面没有死�?""
         page.goto("/")
         links = page.locator("a[href]").all()
         
@@ -111,8 +111,8 @@ class TestSEOBasics:
                 response = page.request.get(href)
                 assert response.ok, f"链接失效: {href} (状态码: {response.status})"</code></pre>
             
-            <h2>三、Lighthouse 自动化审计</h2>
-            <p>使用 Playwright + Lighthouse 进行自动化性能审计：</p>
+            <h2>三、Lighthouse 自动化审�?/h2>
+            <p>使用 Playwright + Lighthouse 进行自动化性能审计�?/p>
             <pre><code class="language-python">from lighthouse import lighthouse
 
 def test_lighthouse_scores(page: Page):
@@ -130,12 +130,12 @@ def test_lighthouse_scores(page: Page):
     assert result["categories"]["performance"]["score"] >= 0.8, \
         f"性能评分过低: {result['categories']['performance']['score']}"
     assert result["categories"]["accessibility"]["score"] >= 0.9, \
-        f"可访问性评分过低: {result['categories']['accessibility']['score']}"
+        f"可访问性评分过�? {result['categories']['accessibility']['score']}"
     assert result["categories"]["seo"]["score"] >= 0.9, \
         f"SEO 评分过低: {result['categories']['seo']['score']}"</code></pre>
             
             <h2>四、整合到 CI/CD</h2>
-            <p>将 SEO 测试整合到发布流水线中，在每次部署前自动运行：</p>
+            <p>�?SEO 测试整合到发布流水线中，在每次部署前自动运行�?/p>
             <pre><code class="language-yaml">name: SEO Audit
 
 on:
@@ -153,24 +153,24 @@ jobs:
           uploadArtifacts: true
 </code></pre>
             
-            <h2>五、SEO 测试最佳实践</h2>
+            <h2>五、SEO 测试最佳实�?/h2>
             <ul>
                 <li>建立 SEO 基线，监控关键指标的变化趋势</li>
-                <li>对关键页面（首页、产品页）进行重点测试</li>
-                <li>定期抓取全站，检测全站 SEO 健康度</li>
-                <li>将 SEO 指标纳入发布质量门禁</li>
+                <li>对关键页面（首页、产品页）进行重点测�?/li>
+                <li>定期抓取全站，检测全�?SEO 健康�?/li>
+                <li>�?SEO 指标纳入发布质量门禁</li>
                 <li>结合 Google Search Console 数据进行验证</li>
             </ul>
             
             <p style="margin-top: 40px; color: var(--text-tertiary); font-style: italic;">
-                SEO 不是一次性的工作，而是需要持续监控和优化。自动化测试可以帮助你在每次发布时都保持对 SEO 的关注。
+                SEO 不是一次性的工作，而是需要持续监控和优化。自动化测试可以帮助你在每次发布时都保持�?SEO 的关注�?
             </p>
         </div>
     </article>
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体�?/p></div>
                 <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
             </div>
             <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>企业级 Pytest 自动化测试框架设计指南 | PGH Blog</title>
+    <title>企业�?Pytest 自动化测试框架设计指�?| PGH Blog</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -166,10 +166,10 @@
                 </svg>
                 返回博客列表
             </a>
-            <h1 class="post-title">企业级 Pytest 自动化测试框架设计指南</h1>
+            <h1 class="post-title">企业�?Pytest 自动化测试框架设计指�?/h1>
             <div class="post-meta">
                 <span class="post-category">框架设计</span>
-                <span class="post-date">2024年1月8日</span>
+                <span class="post-date">2024�?�?�?/span>
             </div>
         </div>
     </section>
@@ -177,68 +177,68 @@
     <article class="post-content">
         <div class="post-container">
             <p>
-                Pytest 是 Python 生态中最流行的测试框架之一，其简洁的语法、强大的插件系统
+                Pytest �?Python 生态中最流行的测试框架之一，其简洁的语法、强大的插件系统
                 和灵活的 Fixture 机制使其成为构建企业级自动化测试框架的首选。本文将分享
-                如何从零开始设计一个可扩展、易维护的 Pytest 自动化测试框架。
+                如何从零开始设计一个可扩展、易维护�?Pytest 自动化测试框架�?
             </p>
 
-            <h2>一、框架设计原则</h2>
+            <h2>一、框架设计原�?/h2>
 
             <blockquote>
                 好的测试框架应该让编写测试变得简单，让维护测试变得轻松，
-                让测试结果值得信赖。
+                让测试结果值得信赖�?
             </blockquote>
 
             <h3>核心设计原则</h3>
             <ul>
-                <li><strong>可扩展性</strong>：支持新功能模块快速接入，无需修改核心代码</li>
-                <li><strong>可维护性</strong>：代码结构清晰，命名规范，文档完善</li>
-                <li><strong>可读性</strong>：测试用例表达业务意图，而非技术细节</li>
-                <li><strong>稳定性</strong>：减少非预期失败，提供可靠的测试结果</li>
-                <li><strong>可观测性</strong>：完善的日志和报告，便于定位问题</li>
+                <li><strong>可扩展�?/strong>：支持新功能模块快速接入，无需修改核心代码</li>
+                <li><strong>可维护�?/strong>：代码结构清晰，命名规范，文档完�?/li>
+                <li><strong>可读�?/strong>：测试用例表达业务意图，而非技术细�?/li>
+                <li><strong>稳定�?/strong>：减少非预期失败，提供可靠的测试结果</li>
+                <li><strong>可观测�?/strong>：完善的日志和报告，便于定位问题</li>
             </ul>
 
-            <h2>二、目录结构设计</h2>
+            <h2>二、目录结构设�?/h2>
 
             <pre><code class="language-bash">pytest-framework/
 ├── config/                  # 配置文件目录
-│   ├── config.yaml         # 主配置文件
-│   ├── dev.yaml            # 开发环境配置
-│   ├── test.yaml           # 测试环境配置
-│   └── prod.yaml           # 生产环境配置
+�?  ├── config.yaml         # 主配置文�?
+�?  ├── dev.yaml            # 开发环境配�?
+�?  ├── test.yaml           # 测试环境配置
+�?  └── prod.yaml           # 生产环境配置
 ├── core/                    # 核心功能模块
-│   ├── base_test.py        # 测试基类
-│   ├── browser.py          # 浏览器封装
-│   ├── api_client.py       # API 客户端
-│   └── database.py         # 数据库操作
-├── pages/                   # Page Object 层
-│   ├── login_page.py
-│   ├── dashboard_page.py
-│   └── user_page.py
+�?  ├── base_test.py        # 测试基类
+�?  ├── browser.py          # 浏览器封�?
+�?  ├── api_client.py       # API 客户�?
+�?  └── database.py         # 数据库操�?
+├── pages/                   # Page Object �?
+�?  ├── login_page.py
+�?  ├── dashboard_page.py
+�?  └── user_page.py
 ├── fixtures/                # Pytest Fixture
-│   ├── browser_fixture.py
-│   ├── api_fixture.py
-│   └── data_fixture.py
+�?  ├── browser_fixture.py
+�?  ├── api_fixture.py
+�?  └── data_fixture.py
 ├── tests/                   # 测试用例目录
-│   ├── smoke/              # 冒烟测试
-│   ├── regression/         # 回归测试
-│   └── performance/        # 性能测试
+�?  ├── smoke/              # 冒烟测试
+�?  ├── regression/         # 回归测试
+�?  └── performance/        # 性能测试
 ├── utils/                   # 工具函数
-│   ├── logger.py           # 日志工具
-│   ├── data_generator.py   # 测试数据生成
-│   └── report_helper.py    # 报告辅助
-├── outputs/                 # 输出目录（Git 忽略）
-│   ├── logs/
-│   ├── screenshots/
-│   └── reports/
+�?  ├── logger.py           # 日志工具
+�?  ├── data_generator.py   # 测试数据生成
+�?  └── report_helper.py    # 报告辅助
+├── outputs/                 # 输出目录（Git 忽略�?
+�?  ├── logs/
+�?  ├── screenshots/
+�?  └── reports/
 ├── pytest.ini               # Pytest 配置
 ├── requirements.txt         # 依赖管理
 └── conftest.py              # Pytest 全局配置</code></pre>
 
-            <h2>三、核心模块实现</h2>
+            <h2>三、核心模块实�?/h2>
 
             <h3>1. 配置管理</h3>
-            <p>使用 PyYAML 加载配置，支持多环境切换：</p>
+            <p>使用 PyYAML 加载配置，支持多环境切换�?/p>
 
             <pre><code class="language-python"># core/config.py
 import yaml
@@ -294,7 +294,7 @@ class BasePage:
         self.timeout = 30000
     
     def navigate(self, url: str):
-        logger.info(f"导航到: {url}")
+        logger.info(f"导航�? {url}")
         self.page.goto(url)
     
     def click(self, selector: str):
@@ -319,7 +319,7 @@ class BasePage:
         logger.info(f"验证文本: {selector} 包含 {text}")</code></pre>
 
             <h3>3. Fixture 设计</h3>
-            <p>Fixtures 是 Pytest 的灵魂，合理设计 Fixture 能大幅提升效率：</p>
+            <p>Fixtures �?Pytest 的灵魂，合理设计 Fixture 能大幅提升效率：</p>
 
             <pre><code class="language-python"># fixtures/browser_fixture.py
 import pytest
@@ -349,10 +349,10 @@ def browser_context(browser: Browser, request):
 
 @pytest.fixture(scope="function")
 def page(browser_context: BrowserContext, request):
-    """页面 Fixture，function 级别，每个测试用例独立"""
+    """页面 Fixture，function 级别，每个测试用例独�?""
     page = browser_context.new_page()
     
-    # 失败时截图
+    # 失败时截�?
     yield page
     
     if request.node.rep_call.failed:
@@ -362,12 +362,12 @@ def page(browser_context: BrowserContext, request):
     
     page.close()</code></pre>
 
-            <h2>四、测试用例编写规范</h2>
+            <h2>四、测试用例编写规�?/h2>
 
             <h3>好的测试用例应该</h3>
             <ul>
                 <li><strong>命名清晰</strong>：test_模块_场景_预期结果</li>
-                <li><strong>独立完整</strong>：不依赖其他测试用例的执行</li>
+                <li><strong>独立完整</strong>：不依赖其他测试用例的执�?/li>
                 <li><strong>一个断言</strong>：每个测试只验证一个核心点</li>
                 <li><strong>数据隔离</strong>：使用测试数据生成器，不依赖已有数据</li>
             </ul>
@@ -381,7 +381,7 @@ from utils.data_generator import generate_test_user
 
 class TestLogin:
     def test_login_success_with_valid_credentials(self, page):
-        """测试：使用有效凭据登录成功"""
+        """测试：使用有效凭据登录成�?""
         # 准备测试数据
         user = generate_test_user(role='admin')
         
@@ -403,8 +403,8 @@ class TestLogin:
         
         login_page.should_see_error_message("用户名或密码错误")</code></pre>
 
-            <h2>五、报告集成</h2>
-            <p>使用 pytest-html 或 Allure 生成精美的测试报告：</p>
+            <h2>五、报告集�?/h2>
+            <p>使用 pytest-html �?Allure 生成精美的测试报告：</p>
 
             <pre><code class="language-python"># conftest.py
 import pytest
@@ -413,7 +413,7 @@ import os
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
-    """配置 pytest，设置报告输出路径"""
+    """配置 pytest，设置报告输出路�?""
     if not os.path.exists('outputs/reports'):
         os.makedirs('outputs/reports')
     
@@ -422,7 +422,7 @@ def pytest_configure(config):
     config.option.self_contained_html = True
 
 def pytest_html_report_title(report):
-    report.title = "自动化测试报告"
+    report.title = "自动化测试报�?
 
 def pytest_html_results_summary(prefix, summary, postfix):
     prefix.extend([
@@ -441,7 +441,7 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '0 2 * * *'  # 每天凌晨 2 点执行
+    - cron: '0 2 * * *'  # 每天凌晨 2 点执�?
 
 jobs:
   test:
@@ -477,13 +477,13 @@ jobs:
 
             <h3>1. 分层设计</h3>
             <p>
-                将测试框架分为核心层、Page 层、测试用例层，每层只负责自己的职责。
-                当页面元素变化时，只需修改 Page 层，不需要改动测试用例。
+                将测试框架分为核心层、Page 层、测试用例层，每层只负责自己的职责�?
+                当页面元素变化时，只需修改 Page 层，不需要改动测试用例�?
             </p>
 
             <h3>2. Fixture 粒度控制</h3>
             <p>
-                根据 Fixture 的生命周期选择合适的 scope：
+                根据 Fixture 的生命周期选择合适的 scope�?
             </p>
             <ul>
                 <li><code>session</code>：浏览器实例、数据库连接池等</li>
@@ -491,30 +491,30 @@ jobs:
                 <li><code>function</code>：页面实例、独立测试数据等</li>
             </ul>
 
-            <h3>3. 日志和截图</h3>
+            <h3>3. 日志和截�?/h3>
             <p>
                 完善的日志是调试的关键。每个关键操作都要记录日志，
-                测试失败时自动截图，配合视频录制可以快速定位问题。
+                测试失败时自动截图，配合视频录制可以快速定位问题�?
             </p>
 
             <h3>4. 数据驱动</h3>
             <p>
-                使用 <code>@pytest.mark.parametrize</code> 实现数据驱动测试，
-                避免重复代码，同时覆盖更多边界场景。
+                使用 <code>@pytest.mark.parametrize</code> 实现数据驱动测试�?
+                避免重复代码，同时覆盖更多边界场景�?
             </p>
 
             <h2>八、总结</h2>
             <p>
-                一个好的自动化测试框架不是一蹴而就的，需要在实践中持续迭代优化。
-                关键是建立清晰的架构规范，让团队成员能够轻松地贡献测试用例。
+                一个好的自动化测试框架不是一蹴而就的，需要在实践中持续迭代优化�?
+                关键是建立清晰的架构规范，让团队成员能够轻松地贡献测试用例�?
             </p>
             <blockquote>
-                框架的价值不在于技术有多酷炫，而在于是否真正提高了测试效率，
-                是否让团队更有信心进行持续交付。
+                框架的价值不在于技术有多酷炫，而在于是否真正提高了测试效率�?
+                是否让团队更有信心进行持续交付�?
             </blockquote>
             <p>
                 你可以在我的 <a href="https://github.com/PGH11/playwright-pytest-framework" target="_blank" style="color: #10b981;">playwright-pytest-framework</a> 
-                项目中找到完整的框架实现参考。
+                项目中找到完整的框架实现参考�?
             </p>
         </div>
     </article>
@@ -524,7 +524,7 @@ jobs:
             <div class="footer-content">
                 <div class="footer-brand">
                     <span class="logo">PGH<span class="dot">.</span></span>
-                    <p class="footer-tagline">用代码保障质量，用测试守护体验</p>
+                    <p class="footer-tagline">用代码保障质量，用测试守护体�?/p>
                 </div>
                 <div class="footer-links">
                     <div class="footer-column">

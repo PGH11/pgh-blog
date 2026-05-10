@@ -48,152 +48,152 @@
         <div class="post-container">
             <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
             <h1 class="post-title">Screaming Frog SEO 抓取工具配置实战指南</h1>
-            <div class="post-meta"><span class="post-category">SEO 测试</span><span class="post-date">2026年2月9日</span></div>
+            <div class="post-meta"><span class="post-category">SEO 测试</span><span class="post-date">2026�?�?�?/span></div>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
             <blockquote>
-                本文基于 Nuxt 框架项目实战经验，目标是让抓取结果尽量贴近搜索引擎视角，并确保结构化数据、静态资源等可被正确提取与导出证据。
+                本文基于 Nuxt 框架项目实战经验，目标是让抓取结果尽量贴近搜索引擎视角，并确保结构化数据、静态资源等可被正确提取与导出证据�?
             </blockquote>
             
-            <p>Screaming Frog SEO Spider 是 SEO 测试领域最专业的抓取工具之一，但很多人只用到了它 20% 的功能。本文将分享我在实际项目中总结的完整配置 SOP，让你的 SEO 抓取更精准、更高效。</p>
+            <p>Screaming Frog SEO Spider �?SEO 测试领域最专业的抓取工具之一，但很多人只用到了它 20% 的功能。本文将分享我在实际项目中总结的完整配�?SOP，让你的 SEO 抓取更精准、更高效�?/p>
 
-            <h2>一、选择正确的抓取模式</h2>
+            <h2>一、选择正确的抓取模�?/h2>
             
             <h3>1.1 Spider 模式 - 全站体检</h3>
-            <p>用于系统扫描整个站点，输入站点入口 URL 后工具会沿着站内链接自动爬行。适合项目初期的全面 SEO 健康度检查。</p>
+            <p>用于系统扫描整个站点，输入站点入�?URL 后工具会沿着站内链接自动爬行。适合项目初期的全�?SEO 健康度检查�?/p>
             
             <h3>1.2 List 模式 - 新增页面验收</h3>
-            <p><strong>这是我最推荐的回归测试方式！</strong>把待验收的 URL 清单逐行导入，只抓取这批 URL，结果更干净，不会混入其他页面的噪音。特别适合：</p>
+            <p><strong>这是我最推荐的回归测试方式！</strong>把待验收�?URL 清单逐行导入，只抓取这批 URL，结果更干净，不会混入其他页面的噪音。特别适合�?/p>
             <ul>
-                <li>新功能上线时的页面验收</li>
+                <li>新功能上线时的页面验�?/li>
                 <li>修复后的回归验证</li>
-                <li>指定页面的专项检查</li>
+                <li>指定页面的专项检�?/li>
             </ul>
 
             <div class="tip-box">
                 <h4>💡 实战建议</h4>
-                <p>配合 sitemap 提取脚本，先从 sitemap.xml 导出所有页面 URL，再导入 List 模式进行批量扫描，效率最高。</p>
+                <p>配合 sitemap 提取脚本，先�?sitemap.xml 导出所有页�?URL，再导入 List 模式进行批量扫描，效率最高�?/p>
             </div>
 
-            <h2>二、渲染口径配置</h2>
+            <h2>二、渲染口径配�?/h2>
             
-            <p>对于 Nuxt 这类 SSR/SSG 框架，渲染方式的选择尤为关键：</p>
+            <p>对于 Nuxt 这类 SSR/SSG 框架，渲染方式的选择尤为关键�?/p>
             
             <h3>2.1 Text Only 模式</h3>
-            <p>类似直接查看页面源代码，速度快，适合 SSR/静态站点。但如果页面依赖 JS 注入 title、H1、正文、Schema 等内容，会被误判为缺失。</p>
+            <p>类似直接查看页面源代码，速度快，适合 SSR/静态站点。但如果页面依赖 JS 注入 title、H1、正文、Schema 等内容，会被误判为缺失�?/p>
             
             <h3>2.2 JavaScript 渲染模式</h3>
-            <p>更接近真实浏览器的渲染结果，但速度相对较慢。用于判定 client-only 或异步加载导致的可抓取性问题。</p>
+            <p>更接近真实浏览器的渲染结果，但速度相对较慢。用于判�?client-only 或异步加载导致的可抓取性问题�?/p>
             
             <div class="tip-box">
                 <h4>🎯 推荐实践：两轮对比法</h4>
-                <p><strong>第一轮</strong>：Text Only 快速扫描明显错误（title、description、canonical、状态码等）<br>
-                <strong>第二轮</strong>：用 JavaScript Rendering 复核并导出证据进行对比</p>
+                <p><strong>第一�?/strong>：Text Only 快速扫描明显错误（title、description、canonical、状态码等）<br>
+                <strong>第二�?/strong>：用 JavaScript Rendering 复核并导出证据进行对�?/p>
             </div>
             
-            <p>配置入口：<code>Configuration > Spider > Rendering</code></p>
+            <p>配置入口�?code>Configuration > Spider > Rendering</code></p>
 
             <h2>三、必开功能：结构化数据提取</h2>
             
-            <p>如果你要检查 Schema.org（JSON-LD/Microdata/RDFa），必须开启结构化数据提取功能，否则工具不会解析这部分内容。</p>
+            <p>如果你要检�?Schema.org（JSON-LD/Microdata/RDFa），必须开启结构化数据提取功能，否则工具不会解析这部分内容�?/p>
             
-            <p><strong>配置步骤：</strong></p>
+            <p><strong>配置步骤�?/strong></p>
             <ol>
                 <li>进入 <code>Configuration > Spider > Extraction</code></li>
-                <li>勾选 <code>Extract Structured Data</code></li>
-                <li>启用 JSON-LD / Microdata / RDFa（按站点实际使用选择）</li>
+                <li>勾�?<code>Extract Structured Data</code></li>
+                <li>启用 JSON-LD / Microdata / RDFa（按站点实际使用选择�?/li>
             </ol>
             
-            <p><strong>验证是否生效：</strong>抓取 1 个你确定有 Schema 的 URL，查看 <code>Structured Data</code> Tab 是否出现 <code>Types</code>。</p>
+            <p><strong>验证是否生效�?/strong>抓取 1 个你确定�?Schema �?URL，查�?<code>Structured Data</code> Tab 是否出现 <code>Types</code>�?/p>
 
-            <h2>四、必开功能：抓取静态资源</h2>
+            <h2>四、必开功能：抓取静态资�?/h2>
             
-            <p>很多人容易忽略这一步，但静态资源的 404 会严重影响 SEO 评分和用户体验。</p>
+            <p>很多人容易忽略这一步，但静态资源的 404 会严重影�?SEO 评分和用户体验�?/p>
             
-            <p><strong>配置步骤：</strong></p>
+            <p><strong>配置步骤�?/strong></p>
             <ol>
                 <li>进入 <code>Configuration > Spider > Crawl</code></li>
-                <li>勾选 <code>Crawl Linked Resources</code></li>
-                <li>确保 Images、CSS、JavaScript 都在 Crawl 范围内</li>
+                <li>勾�?<code>Crawl Linked Resources</code></li>
+                <li>确保 Images、CSS、JavaScript 都在 Crawl 范围�?/li>
             </ol>
             
-            <p>开启后，你可以发现：</p>
+            <p>开启后，你可以发现�?/p>
             <ul>
                 <li>图片 404 问题</li>
                 <li>CSS/JS 文件加载失败</li>
                 <li>字体文件跨域问题</li>
             </ul>
 
-            <h2>五、Robots 与 User-Agent 配置</h2>
+            <h2>五、Robots �?User-Agent 配置</h2>
             
             <h3>5.1 Robots.txt 策略</h3>
-            <p>默认建议 <code>Respect robots.txt</code>，这样更贴近搜索引擎的真实抓取行为。在测试/预发环境若 robots 被禁止，可临时关闭。</p>
+            <p>默认建议 <code>Respect robots.txt</code>，这样更贴近搜索引擎的真实抓取行为。在测试/预发环境�?robots 被禁止，可临时关闭�?/p>
             
             <h3>5.2 User-Agent 选择</h3>
             <ul>
-                <li><strong>必测：</strong><code>Googlebot Smartphone</code> - 模拟谷歌爬虫</li>
-                <li><strong>调试：</strong><code>Chrome</code> + JS Rendering - 复核交互和渲染问题</li>
+                <li><strong>必测�?/strong><code>Googlebot Smartphone</code> - 模拟谷歌爬虫</li>
+                <li><strong>调试�?/strong><code>Chrome</code> + JS Rendering - 复核交互和渲染问�?/li>
             </ul>
 
             <h2>六、速度限制配置</h2>
             
             <p>别把服务器搞挂了！建议使用保守值：</p>
             <ul>
-                <li><strong>线程数（Threads）</strong>：3~5</li>
-                <li><strong>每秒请求数（URLs/s）</strong>：1~2</li>
-                <li><strong>超时时间（Timeout）</strong>：20~30s</li>
+                <li><strong>线程数（Threads�?/strong>�?~5</li>
+                <li><strong>每秒请求数（URLs/s�?/strong>�?~2</li>
+                <li><strong>超时时间（Timeout�?/strong>�?0~30s</li>
             </ul>
             
-            <p>具体数值请根据站点承载能力调整，大公司的站点可以适当调高。</p>
+            <p>具体数值请根据站点承载能力调整，大公司的站点可以适当调高�?/p>
 
-            <h2>七、Sitemap 与 URL 输入建议</h2>
+            <h2>七、Sitemap �?URL 输入建议</h2>
             
-            <h3>7.1 检查 sitemap 本身</h3>
-            <p>直接用 <code>List</code> 模式导入 sitemap URL（例如 <code>/sitemap.xml</code>、<code>/sitemap-video.xml</code>），查看 Response Codes 与解析情况。</p>
+            <h3>7.1 检�?sitemap 本身</h3>
+            <p>直接�?<code>List</code> 模式导入 sitemap URL（例�?<code>/sitemap.xml</code>�?code>/sitemap-video.xml</code>），查看 Response Codes 与解析情况�?/p>
             
-            <h3>7.2 只验收新增页面</h3>
-            <p>用 <code>List</code> 模式导入 URL 清单（每行一个 URL），精准控制抓取范围。</p>
+            <h3>7.2 只验收新增页�?/h3>
+            <p>�?<code>List</code> 模式导入 URL 清单（每行一�?URL），精准控制抓取范围�?/p>
 
-            <h2>八、报告导出规范</h2>
+            <h2>八、报告导出规�?/h2>
             
-            <p>SEO 测试需要留下证据，建议：</p>
+            <p>SEO 测试需要留下证据，建议�?/p>
             <ul>
-                <li>每个问题项导出命中 URL 列表（含 Status Code）</li>
-                <li>必要时附上 <code>Inlinks</code>（定位来源页，方便开发修复）</li>
+                <li>每个问题项导出命�?URL 列表（含 Status Code�?/li>
+                <li>必要时附�?<code>Inlinks</code>（定位来源页，方便开发修复）</li>
                 <li>Structured Data 类问题导出：Types、Validation Errors/Warnings、涉及的 URL 字段</li>
             </ul>
 
-            <h2>九、与自动化脚本配合</h2>
+            <h2>九、与自动化脚本配�?/h2>
             
-            <p>在我的 testing-skills 仓库中，Screaming Frog 通常配合以下脚本使用：</p>
+            <p>在我�?testing-skills 仓库中，Screaming Frog 通常配合以下脚本使用�?/p>
             <ul>
-                <li><strong>extract_sitemap_urls.py</strong> - 先从 sitemap 提取所有 URL</li>
-                <li><strong>check_urls_violations.py</strong> - 进行多语言内容合规性检查</li>
-                <li>Screaming Frog 做深度 SEO 结构分析</li>
+                <li><strong>extract_sitemap_urls.py</strong> - 先从 sitemap 提取所�?URL</li>
+                <li><strong>check_urls_violations.py</strong> - 进行多语言内容合规性检�?/li>
+                <li>Screaming Frog 做深�?SEO 结构分析</li>
             </ul>
             
-            <p>这样形成一套完整的自动化 SEO 测试流程。</p>
+            <p>这样形成一套完整的自动�?SEO 测试流程�?/p>
 
             <h2>总结</h2>
             
             <p>Screaming Frog 是一个功能强大的工具，但只有正确配置才能发挥它的价值。记住这几个关键点：</p>
             <ul>
-                <li>根据场景选择抓取模式（全站 vs 列表）</li>
-                <li>JavaScript 渲染站点务必开启 JS 渲染模式</li>
+                <li>根据场景选择抓取模式（全�?vs 列表�?/li>
+                <li>JavaScript 渲染站点务必开�?JS 渲染模式</li>
                 <li>不要忘了结构化数据和静态资源的提取</li>
-                <li>User-Agent 用 Googlebot，尽量贴近真实搜索引擎</li>
+                <li>User-Agent �?Googlebot，尽量贴近真实搜索引�?/li>
                 <li>合理的速度设置，避免对测试服务器造成压力</li>
             </ul>
             
-            <p>希望这篇实战指南能帮助你更专业地进行 SEO 测试！</p>
+            <p>希望这篇实战指南能帮助你更专业地进行 SEO 测试�?/p>
         </div>
     </article>
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体�?/p></div>
                 <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
             </div>
             <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>

@@ -45,21 +45,21 @@
         <div class="post-container">
             <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
             <h1 class="post-title">CI/CD 流水线中的自动化测试集成策略</h1>
-            <div class="post-meta"><span class="post-category">最佳实践</span><span class="post-date">2023年12月10日</span></div>
+            <div class="post-meta"><span class="post-category">最佳实�?/span><span class="post-date">2023�?2�?0�?/span></div>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
-            <p>将自动化测试集成到 CI/CD 流水线中是实现持续交付的关键一环。本文将分享如何在 GitHub Actions、GitLab CI 等平台中高效集成自动化测试，以及如何处理测试分层、并行执行等优化技巧。</p>
+            <p>将自动化测试集成�?CI/CD 流水线中是实现持续交付的关键一环。本文将分享如何�?GitHub Actions、GitLab CI 等平台中高效集成自动化测试，以及如何处理测试分层、并行执行等优化技巧�?/p>
             
-            <h2>一、测试分层策略</h2>
+            <h2>一、测试分层策�?/h2>
             <p>并非所有测试都需要在每次提交时执行。合理的测试分层策略是提高流水线效率的关键：</p>
             <ul>
-                <li><strong>单元测试（Unit Tests）</strong>：每次提交必跑，快速反馈</li>
-                <li><strong>接口测试（API Tests）</strong>：每次 PR 执行，验证业务逻辑</li>
-                <li><strong>集成测试（Integration Tests）</strong>：每日定时或合并前执行</li>
-                <li><strong>E2E 测试（End-to-End）</strong>：每日定时或发布前执行，耗时较长</li>
-                <li><strong>性能测试（Performance Tests）</strong>：每周或版本发布前执行</li>
+                <li><strong>单元测试（Unit Tests�?/strong>：每次提交必跑，快速反�?/li>
+                <li><strong>接口测试（API Tests�?/strong>：每�?PR 执行，验证业务逻辑</li>
+                <li><strong>集成测试（Integration Tests�?/strong>：每日定时或合并前执�?/li>
+                <li><strong>E2E 测试（End-to-End�?/strong>：每日定时或发布前执行，耗时较长</li>
+                <li><strong>性能测试（Performance Tests�?/strong>：每周或版本发布前执�?/li>
             </ul>
             
             <h2>二、GitHub Actions 集成示例</h2>
@@ -111,11 +111,11 @@ jobs:
         if: failure()
         with: { name: e2e-screenshots, path: outputs/screenshots/ }</code></pre>
             
-            <h2>三、测试执行优化</h2>
+            <h2>三、测试执行优�?/h2>
             
             <h3>1. 并行执行</h3>
             <p>使用 pytest-xdist 实现测试用例并行执行，大幅缩短执行时间：</p>
-            <pre><code class="language-bash">pytest tests/ -n auto  # 自动使用 CPU 核心数</code></pre>
+            <pre><code class="language-bash">pytest tests/ -n auto  # 自动使用 CPU 核心�?/code></pre>
             
             <h3>2. 失败重试</h3>
             <p>对于不稳定的 E2E 测试，配置自动重试：</p>
@@ -131,29 +131,29 @@ pytest tests/ --shard-id=2 --num-shards=4</code></pre>
             
             <h2>四、测试报告与反馈</h2>
             <ul>
-                <li>测试结果自动评论到 PR 中</li>
+                <li>测试结果自动评论�?PR �?/li>
                 <li>失败时自动上传截图和日志作为 Artifact</li>
-                <li>将测试覆盖率报告推送到 Codecov 等平台</li>
-                <li>测试失败时通知相关开发人员</li>
+                <li>将测试覆盖率报告推送到 Codecov 等平�?/li>
+                <li>测试失败时通知相关开发人�?/li>
             </ul>
             
-            <h2>五、常见问题处理</h2>
+            <h2>五、常见问题处�?/h2>
             <ul>
-                <li><strong>测试环境准备</strong>：使用 Docker Compose 一键启动依赖服务</li>
-                <li><strong>Flaky Tests</strong>：记录失败历史，识别不稳定测试</li>
-                <li><strong>测试数据</strong>：使用独立的测试数据库，每次测试前重置</li>
+                <li><strong>测试环境准备</strong>：使�?Docker Compose 一键启动依赖服�?/li>
+                <li><strong>Flaky Tests</strong>：记录失败历史，识别不稳定测�?/li>
+                <li><strong>测试数据</strong>：使用独立的测试数据库，每次测试前重�?/li>
                 <li><strong>执行时间</strong>：设置合理的超时，避免流水线卡死</li>
             </ul>
             
             <p style="margin-top: 40px; color: var(--text-tertiary); font-style: italic;">
-                CI/CD 中的自动化测试不是为了 100% 覆盖率，而是为了给团队提供快速、可靠的质量反馈，让发布变得更有信心。
+                CI/CD 中的自动化测试不是为�?100% 覆盖率，而是为了给团队提供快速、可靠的质量反馈，让发布变得更有信心�?
             </p>
         </div>
     </article>
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体�?/p></div>
                 <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
             </div>
             <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>
