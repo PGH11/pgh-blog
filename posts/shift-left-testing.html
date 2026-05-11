@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>测试左移实践：在开发阶段融入质量保�?| PGH Blog</title>
+    <title>测试左移实践：在开发阶段融入质量保障 | PGH Blog</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -37,31 +37,31 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="../index.html" class="logo">PGH<span class="dot">.</span></a>
-            <ul class="nav-links"><li><a href="../index.html">首页</a></li><li><a href="../blog.html" class="active">博客</a></li><li><a href="../projects.html">项目</a></li><li><a href="../about.html">关于</a></li></ul>
+            <ul class="nav-links"></ul>
             <div class="hamburger"><span></span><span></span><span></span></div>
         </div>
     </nav>
     <section class="post-header">
         <div class="post-container">
             <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
-            <h1 class="post-title">测试左移实践：在开发阶段融入质量保�?/h1>
-            <div class="post-meta"><span class="post-category">测试左移</span><span class="post-date">2023�?1�?5�?/span></div>
+            <h1 class="post-title">测试左移实践：在开发阶段融入质量保障</h1>
+            <div class="post-meta"><span class="post-category">测试左移</span><span class="post-date">2023年11月15日</span></div>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
-            <p>传统的测试工作往往发生在开发完成之后，这导致缺陷发现成本高、修复周期长。测试左移（Shift Left Testing）的理念是将测试活动尽可能早地融入到软件开发流程中，在缺陷产生的源头就进行质量把控。本文将分享测试左移的具体实践方法�?/p>
+            <p>传统的测试工作往往发生在开发完成之后，这导致缺陷发现成本高、修复周期长。测试左移（Shift Left Testing）的理念是将测试活动尽可能早地融入到软件开发流程中，在缺陷产生的源头就进行质量把控。本文将分享测试左移的具体实践方法。</p>
             
-            <h2>一、为什么要测试左移�?/h2>
+            <h2>一、为什么要测试左移？</h2>
             <ul>
                 <li><strong>降低修复成本</strong>：缺陷发现越早，修复成本越低（研究表明，生产环境的缺陷修复成本是开发阶段的 100 倍）</li>
                 <li><strong>缩短反馈周期</strong>：开发人员可以立即得到反馈，上下文切换成本低</li>
-                <li><strong>提高测试效率</strong>：避免重复测试，测试人员可以专注于复杂场�?/li>
-                <li><strong>建立质量文化</strong>：让质量成为整个团队的共同责�?/li>
+                <li><strong>提高测试效率</strong>：避免重复测试，测试人员可以专注于复杂场景</li>
+                <li><strong>建立质量文化</strong>：让质量成为整个团队的共同责任</li>
             </ul>
             
             <h2>二、代码审查中的测试关注点</h2>
-            <p>测试工程师参与代码审查是测试左移的重要一环。审查时重点关注�?/p>
+            <p>测试工程师参与代码审查是测试左移的重要一环。审查时重点关注：</p>
             <ul>
                 <li>异常处理逻辑是否完善</li>
                 <li>边界条件处理是否正确</li>
@@ -71,9 +71,9 @@
                 <li>接口设计是否符合测试友好原则</li>
             </ul>
             
-            <h2>三、开发环境的自动化测�?/h2>
+            <h2>三、开发环境的自动化测试</h2>
             <p>让开发者在本地就能运行自动化测试：</p>
-            <pre><code class="language-makefile"># Makefile - 开发者一键测�?
+            <pre><code class="language-makefile"># Makefile - 开发者一键测试
 .PHONY: test test-unit test-api lint
 
 test: lint test-unit test-api
@@ -92,21 +92,21 @@ lint:
 dev:
     uvicorn src.main:app --reload</code></pre>
             
-            <h2>四、单元测试规�?/h2>
+            <h2>四、单元测试规范</h2>
             <p>建立团队统一的单元测试规范：</p>
             <pre><code class="language-python">import pytest
 
 class TestUserService:
     """用户服务测试
     
-    测试分类�?
+    测试分类：
     - 正常流程
     - 边界条件
     - 异常场景
     """
     
     def test_create_user_success(self):
-        """测试：创建用户成�?""
+        """测试：创建用户成功"""
         # GIVEN - 准备测试数据
         user_data = {"username": "test001", "email": "test@example.com"}
         
@@ -121,9 +121,9 @@ class TestUserService:
     @pytest.mark.parametrize(
         "username,expected_error",
         [
-            ("", "用户名不能为�?),
+            ("", "用户名不能为空"),
             ("a", "用户名长度至少为 2"),
-            ("a" * 51, "用户名长度不能超�?50"),
+            ("a" * 51, "用户名长度不能超过 50"),
         ],
     )
     def test_create_user_with_invalid_username(self, username, expected_error):
@@ -133,39 +133,39 @@ class TestUserService:
         
         assert expected_error in str(exc_info.value)</code></pre>
             
-            <h2>五、测试契约与自动�?/h2>
+            <h2>五、测试契约与自动化</h2>
             <ul>
-                <li><strong>API 契约测试</strong>：使�?Pact 等工具，确保前后端接口约定一�?/li>
-                <li><strong>数据库变更测�?/strong>：每个数据库迁移脚本都要有回滚测�?/li>
-                <li><strong>配置变更测试</strong>：配置文件变更时自动验证配置有效�?/li>
+                <li><strong>API 契约测试</strong>：使用 Pact 等工具，确保前后端接口约定一致</li>
+                <li><strong>数据库变更测试</strong>：每个数据库迁移脚本都要有回滚测试</li>
+                <li><strong>配置变更测试</strong>：配置文件变更时自动验证配置有效性</li>
             </ul>
             
-            <h2>六、建立质量门�?/h2>
-            <p>�?CI 流水线中设置质量门禁，不达标代码无法合并�?/p>
+            <h2>六、建立质量门禁</h2>
+            <p>在 CI 流水线中设置质量门禁，不达标代码无法合并：</p>
             <ul>
-                <li>单元测试覆盖率不得低�?80%</li>
-                <li>新增代码覆盖率不得低�?90%</li>
-                <li>没有通过安全扫描的代码不能合�?/li>
+                <li>单元测试覆盖率不得低于 80%</li>
+                <li>新增代码覆盖率不得低于 90%</li>
+                <li>没有通过安全扫描的代码不能合并</li>
                 <li>所有自动化测试必须全部通过</li>
             </ul>
             
             <h2>七、挑战与应对</h2>
             <ul>
-                <li><strong>开发人员抵�?/strong>：从工具链优化入手，让测试变得简单易�?/li>
-                <li><strong>时间压力</strong>：将测试时间纳入开发估�?/li>
-                <li><strong>技能不�?/strong>：组织结对编程和技术分享，提升团队测试能力</li>
+                <li><strong>开发人员抵触</strong>：从工具链优化入手，让测试变得简单易用</li>
+                <li><strong>时间压力</strong>：将测试时间纳入开发估时</li>
+                <li><strong>技能不足</strong>：组织结对编程和技术分享，提升团队测试能力</li>
             </ul>
             
             <p style="margin-top: 40px; color: var(--text-tertiary); font-style: italic;">
-                测试左移不是让测试工程师去抢开发的工作，而是让质量意识融入每个开发环节，让整个团队共同为产品质量负责�?
+                测试左移不是让测试工程师去抢开发的工作，而是让质量意识融入每个开发环节，让整个团队共同为产品质量负责。
             </p>
         </div>
     </article>
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体�?/p></div>
-                <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-links"><div class="footer-column"><h4>导航</h4></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
             </div>
             <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>
         </div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web 页面冷启动性能自动化测试实�?| PGH Blog</title>
+    <title>Web 页面冷启动性能自动化测试实践 | PGH Blog</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -39,46 +39,46 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="../index.html" class="logo">PGH<span class="dot">.</span></a>
-            <ul class="nav-links"><li><a href="../index.html">首页</a></li><li><a href="../blog.html" class="active">博客</a></li><li><a href="../projects.html">项目</a></li><li><a href="../about.html">关于</a></li></ul>
+            <ul class="nav-links"></ul>
             <div class="hamburger"><span></span><span></span><span></span></div>
         </div>
     </nav>
     <section class="post-header">
         <div class="post-container">
             <a href="../blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
-            <h1 class="post-title">Web 页面冷启动性能自动化测试实�?/h1>
-            <div class="post-meta"><span class="post-category">性能测试</span><span class="post-date">2026�?�?0�?/span></div>
+            <h1 class="post-title">Web 页面冷启动性能自动化测试实践</h1>
+            <div class="post-meta"><span class="post-category">性能测试</span><span class="post-date">2026年1月20日</span></div>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
-            <p>页面加载速度直接影响用户体验�?SEO 排名。但性能测试往往需要专业工具和复杂配置，难以集成到日常开发流程中。本文分享我基于 Performance API 开发的轻量级页面冷启动性能测试方案，让每个开发都能轻松做性能测试�?/p>
+            <p>页面加载速度直接影响用户体验和 SEO 排名。但性能测试往往需要专业工具和复杂配置，难以集成到日常开发流程中。本文分享我基于 Performance API 开发的轻量级页面冷启动性能测试方案，让每个开发都能轻松做性能测试。</p>
 
-            <h2>一、为什么要做自动化性能测试�?/h2>
+            <h2>一、为什么要做自动化性能测试？</h2>
             
-            <p>性能问题往往�?温水煮青�?，在开发过程中不知不觉就变慢了�?/p>
+            <p>性能问题往往是"温水煮青蛙"，在开发过程中不知不觉就变慢了：</p>
             
             <ul>
                 <li>引入一个新组件，页面加载时间增加了 200ms</li>
-                <li>新增第三�?SDK，阻塞了主线�?/li>
-                <li>图片忘记压缩，首屏加载变�?/li>
-                <li>Webpack 配置变更，打包体积突然变�?/li>
+                <li>新增第三方 SDK，阻塞了主线程</li>
+                <li>图片忘记压缩，首屏加载变慢</li>
+                <li>Webpack 配置变更，打包体积突然变大</li>
             </ul>
             
-            <p>等到上线后再发现性能退化，回滚成本很高。我们需要在每次提交时就能自动检测这些问题�?/p>
+            <p>等到上线后再发现性能退化，回滚成本很高。我们需要在每次提交时就能自动检测这些问题。</p>
 
             <h2>二、核心性能指标</h2>
             
-            <p>基于浏览�?Performance API，我们重点关注这些指标：</p>
+            <p>基于浏览器 Performance API，我们重点关注这些指标：</p>
             
             <div class="metric-card">
                 <h4>📊 关键性能指标</h4>
                 <ul style="margin: 0; padding-left: 20px;">
                     <li><strong>DOMContentLoaded</strong> - DOM 解析完成时间</li>
-                    <li><strong>Load</strong> - 页面所有资源加载完成时�?/li>
+                    <li><strong>Load</strong> - 页面所有资源加载完成时间</li>
                     <li><strong>First Paint (FP)</strong> - 首次绘制时间</li>
                     <li><strong>First Contentful Paint (FCP)</strong> - 首次内容绘制时间</li>
-                    <li><strong>Largest Contentful Paint (LCP)</strong> - 最大内容绘制时�?/li>
+                    <li><strong>Largest Contentful Paint (LCP)</strong> - 最大内容绘制时间</li>
                     <li><strong>资源加载统计</strong> - JS/CSS/图片的数量和大小</li>
                 </ul>
             </div>
@@ -109,16 +109,16 @@ function getPerformanceMetrics() {
         cssResources: resources.filter(r => r.initiatorType === 'css').length,
         imageResources: resources.filter(r => r.initiatorType === 'img').length,
         
-        // 慢资源列表（超过 1s�?
+        // 慢资源列表（超过 1s）
         slowResources: resources
             .filter(r => r.duration > 1000)
             .map(r => ({ name: r.name, duration: r.duration }))
     };
 }</code></pre>
 
-            <h2>四、Python 自动化测试实�?/h2>
+            <h2>四、Python 自动化测试实现</h2>
             
-            <p>使用 Playwright 控制浏览器，自动采集性能数据�?/p>
+            <p>使用 Playwright 控制浏览器，自动采集性能数据：</p>
             
             <pre><code class="language-python">from playwright.sync_api import sync_playwright
 import json
@@ -130,16 +130,16 @@ class PerformanceTester:
         self.results = []
     
     def test_single_page(self, path, runs=3):
-        """测试单个页面，多次运行取中位�?""
+        """测试单个页面，多次运行取中位数"""
         url = f"{self.base_url}{path}"
-        print(f"测试页面: {url} (运行 {runs} �?")
+        print(f"测试页面: {url} (运行 {runs} 次)")
         
         metrics_list = []
         
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
-                args=['--disable-cache', '--disable-extensions']  # 冷启动模�?
+                args=['--disable-cache', '--disable-extensions']  # 冷启动模式
             )
             
             for i in range(runs):
@@ -195,7 +195,7 @@ class PerformanceTester:
         return result
     
     def _median(self, values):
-        """计算中位�?""
+        """计算中位数"""
         return statistics.median(sorted(values))
     
     def generate_report(self, output_file):
@@ -246,7 +246,7 @@ class PerformanceTester:
 
             <h2>五、批量测试与基线对比</h2>
             
-            <p>测试核心页面并与历史基线对比�?/p>
+            <p>测试核心页面并与历史基线对比：</p>
             
             <pre><code class="language-python">def run_performance_test():
     """运行完整性能测试"""
@@ -268,7 +268,7 @@ class PerformanceTester:
     # 生成报告
     report = tester.generate_report('reports/performance.json')
     
-    # 与基线对�?
+    # 与基线对比
     baseline = load_baseline()
     if baseline:
         compare_with_baseline(report, baseline)
@@ -279,15 +279,15 @@ class PerformanceTester:
         for w in report['warnings']:
             print(f"  [{w['level']}] {w['page']}: {w['message']}")
     else:
-        print("\n�?所有页面性能正常")
+        print("\n✅ 所有页面性能正常")
     
-    # 如果有严重告警，返回�?0 退出码
+    # 如果有严重告警，返回非 0 退出码
     has_danger = any(w['level'] == 'danger' for w in report['warnings'])
     exit(1 if has_danger else 0)</code></pre>
 
-            <h2>六、CI 流水线集�?/h2>
+            <h2>六、CI 流水线集成</h2>
             
-            <p>将性能测试集成到每�?PR 中：</p>
+            <p>将性能测试集成到每次 PR 中：</p>
             
             <pre><code class="language-yaml"># .github/workflows/performance.yml
 name: 性能测试
@@ -325,7 +325,7 @@ jobs:
           name: performance-report
           path: reports/</code></pre>
 
-            <h2>七、性能阈值配�?/h2>
+            <h2>七、性能阈值配置</h2>
             
             <p>为每个页面设置合理的性能阈值：</p>
             
@@ -346,18 +346,18 @@ jobs:
             <h2>八、常见问题与解决方案</h2>
             
             <h3>8.1 测试结果不稳定？</h3>
-            <p>性能测试结果有波动是正常的，建议�?/p>
+            <p>性能测试结果有波动是正常的，建议：</p>
             <ul>
-                <li>多次运行取中位数�?~5 次）</li>
-                <li>�?CI 中使用同一规格的机器执�?/li>
-                <li>关闭浏览器缓存，模拟冷启�?/li>
-                <li>排除第三方广�?统计脚本的干�?/li>
+                <li>多次运行取中位数（3~5 次）</li>
+                <li>在 CI 中使用同一规格的机器执行</li>
+                <li>关闭浏览器缓存，模拟冷启动</li>
+                <li>排除第三方广告/统计脚本的干扰</li>
             </ul>
             
-            <h3>8.2 如何定位性能瓶颈�?/h3>
+            <h3>8.2 如何定位性能瓶颈？</h3>
             <ul>
-                <li>�?Performance API �?resource 数据，找出加载最慢的资源</li>
-                <li>�?Playwright �?trace 功能录制完整的加载过�?/li>
+                <li>用 Performance API 的 resource 数据，找出加载最慢的资源</li>
+                <li>用 Playwright 的 trace 功能录制完整的加载过程</li>
                 <li>集成 Lighthouse CI 获得更详细的优化建议</li>
             </ul>
 
@@ -367,21 +367,21 @@ jobs:
             
             <ul>
                 <li><strong>轻量级：</strong>无需复杂的性能测试平台，纯 Python 脚本即可实现</li>
-                <li><strong>标准化：</strong>基于浏览器标�?API，数据准确可�?/li>
-                <li><strong>易集成：</strong>轻松接入 CI 流水线，每次 PR 自动检�?/li>
-                <li><strong>可扩展：</strong>可以轻松添加更多指标和检测规�?/li>
+                <li><strong>标准化：</strong>基于浏览器标准 API，数据准确可靠</li>
+                <li><strong>易集成：</strong>轻松接入 CI 流水线，每次 PR 自动检测</li>
+                <li><strong>可扩展：</strong>可以轻松添加更多指标和检测规则</li>
             </ul>
             
-            <p>性能优化不是一次性的工作，而是需要持续关注。通过自动化性能测试，我们可以在开发阶段就发现性能退化问题，避免上线后再花几倍的时间去修复�?/p>
+            <p>性能优化不是一次性的工作，而是需要持续关注。通过自动化性能测试，我们可以在开发阶段就发现性能退化问题，避免上线后再花几倍的时间去修复。</p>
             
-            <p>完整的测试脚本可以在我的 <a href="https://github.com/PGH11/testing-skills" target="_blank" style="color: #ec4899;">testing-skills</a> GitHub 仓库中找到�?/p>
+            <p>完整的测试脚本可以在我的 <a href="https://github.com/PGH11/testing-skills" target="_blank" style="color: #ec4899;">testing-skills</a> GitHub 仓库中找到。</p>
         </div>
     </article>
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体�?/p></div>
-                <div class="footer-links"><div class="footer-column"><h4>导航</h4><a href="../index.html">首页</a><a href="../blog.html">博客</a><a href="../projects.html">项目</a><a href="../about.html">关于</a></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
+                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
+                <div class="footer-links"><div class="footer-column"><h4>导航</h4></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
             </div>
             <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>
         </div>
