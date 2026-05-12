@@ -64,11 +64,13 @@
 
 <p>当前脚本里硬编码了：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>LANGSMITH_PROJECT_VALUE = "test"
+</code></pre></p>
 
 <p>所以 trace 应该出现在 LangSmith 的：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>Tracing -&gt; test
+</code></pre></p>
 
 <p>如果看不到数据，先检查这几件事：</p>
 
@@ -86,13 +88,28 @@
 
 <p>现在代码里每次执行：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(
+    state,
+    config={
+        "run_name": "video_creation_agent",
+        "tags": ["cli", "langgraph", "litmedia"],
+        "metadata": {
+            "route": state.get("route"),
+            "awaiting_confirmation": state.get("awaiting_confirmation"),
+            "has_prompt": bool(state["params"].prompt),
+        },
+    },
+)
+</code></pre></p>
 
 <p>所以 LangSmith 里一条 <code>video_creation_agent</code> 基本对应一次用户输入。</p>
 
 <p>比如用户连续输入三次：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我想做一个小狗视频
+第一个不错
+确认生成
+</code></pre></p>
 
 <p>通常就会看到三条 <code>video_creation_agent</code> run。</p>
 
@@ -100,7 +117,18 @@
 
 <p>点开一条 trace，左侧会出现类似结构：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>video_creation_agent
+  ├─ intent_router
+  │   └─ ChatOpenAI
+  ├─ route_by_intent
+  ├─ creative_worker
+  │   └─ RunnableSequence
+  │       └─ ChatOpenAI
+  ├─ reflection_worker
+  │   └─ ChatOpenAI
+  ├─ route_after_reflection
+  └─ tool_executor
+</code></pre></p>
 
 <p>不一定每次都有所有节点。</p>
 
@@ -133,11 +161,16 @@
 
 <p>这个节点负责判断路由：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>chat 或 creative
+</code></pre></p>
 
 <p>重点看 Output 里的：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "creative",
+  "reason": "..."
+}
+</code></pre></p>
 
 <p>排查方式：</p>
 
@@ -153,7 +186,8 @@
 
 <p>这个节点不调用模型，只读：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state["route"]
+</code></pre></p>
 
 <p>它耗时通常接近 0。</p>
 
@@ -173,7 +207,10 @@
 
 <p>典型测试：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>你能帮我干嘛？
+我刚刚说了什么？
+现在的 prompt 是什么？
+</code></pre></p>
 
 <p>如果它答非所问，通常是上下文给得不够，或者 <code>CHAT_PROMPT</code> 约束不清。</p>
 
@@ -183,7 +220,18 @@
 
 <p>重点看 Output：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "params": {
+    "prompt": "...",
+    "negative_prompt": "..."
+  },
+  "reply": "...",
+  "awaiting_confirmation": true,
+  "tool_call": {
+    "tool_name": "none"
+  }
+}
+</code></pre></p>
 
 <p>检查点：</p>
 
@@ -213,11 +261,22 @@
 
 <p>重点看 Output：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "reflection_passed": true,
+  "reflection_issues": [],
+  "tool_call": {
+    "tool_name": "none"
+  }
+}
+</code></pre></p>
 
 <p>如果它阻止了工具调用，通常会看到：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "should_block_tool": true,
+  "issues": ["用户尚未明确确认生成"]
+}
+</code></pre></p>
 
 <p>这个节点很适合排查“为什么没有调用接口”。</p>
 
@@ -238,7 +297,10 @@
 
 <p>排查顺序：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>creative_worker 是否返回 tool_call？
+reflection_worker 是否拦截？
+route_after_reflection 是否走 tool？
+</code></pre></p>
 
 <h2>5. Input / Output 怎么看</h2>
 
@@ -250,7 +312,13 @@
 
 <p>常见字段：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>user_input
+params
+frontend_params
+chat_history
+awaiting_confirmation
+tool_call
+</code></pre></p>
 
 <p>看 Input 是为了确认：</p>
 
@@ -297,7 +365,9 @@
 
 <p>注意：<code>creative_worker</code> 使用了 <code>with_structured_output</code>，所以 LangSmith 里可能会显示：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>RunnableSequence
+  └─ ChatOpenAI
+</code></pre></p>
 
 <p>这是正常的。结构化输出内部会有一层 runnable 包装。</p>
 
@@ -318,11 +388,13 @@
 
 <p>看：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>intent_router -&gt; Output
+</code></pre></p>
 
 <p>如果 <code>route</code> 错，改：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>ROUTER_PROMPT
+</code></pre></p>
 
 <p>不要先改 <code>creative_worker</code>。</p>
 
@@ -330,11 +402,13 @@
 
 <p>看：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>creative_worker -&gt; Output -&gt; params
+</code></pre></p>
 
 <p>如果 <code>params.prompt</code> 没变，再看：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>creative_worker -&gt; ChatOpenAI -&gt; Output
+</code></pre></p>
 
 <p>判断是模型没返回，还是合并逻辑没覆盖。</p>
 
@@ -342,7 +416,11 @@
 
 <p>按顺序看：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>creative_worker -&gt; tool_call
+reflection_worker -&gt; should_block_tool
+route_after_reflection
+tool_executor 是否出现
+</code></pre></p>
 
 <p>常见原因：</p>
 
@@ -356,11 +434,13 @@
 
 <p>看：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>tool_executor -&gt; Output
+</code></pre></p>
 
 <p>以及：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>LitMedia payload
+</code></pre></p>
 
 <p>重点检查：</p>
 
@@ -378,57 +458,85 @@
 
 <h3>闲聊</h3>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>你能帮我干嘛？
+</code></pre></p>
 
 <p>预期：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>route = chat
+不进入 creative_worker
+不调用 tool
+</code></pre></p>
 
 <h3>泛创意</h3>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我想做一个小狗视频
+</code></pre></p>
 
 <p>预期：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>route = creative
+给 2-3 个方向
+不设置 tool_call
+</code></pre></p>
 
 <h3>选择方案</h3>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>第一个不错
+</code></pre></p>
 
 <p>预期：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>生成完整 prompt
+awaiting_confirmation = true
+不调用 tool
+</code></pre></p>
 
 <h3>修改 prompt</h3>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>改成更搞笑一点
+</code></pre></p>
 
 <p>预期：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>prompt 被改写
+reply 明确说明已修改
+不调用 tool
+</code></pre></p>
 
 <h3>确认生成</h3>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>确认生成
+</code></pre></p>
 
 <p>预期：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>creative_worker 返回 tool_call = submit_video_generation
+reflection_worker 通过
+进入 tool_executor
+</code></pre></p>
 
 <h3>未确认时问状态</h3>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>提交了吗？
+</code></pre></p>
 
 <p>预期：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>不调用 tool
+回复当前还没有提交
+</code></pre></p>
 
 <h2>9. 推荐看 trace 的顺序</h2>
 
 <p>一条 trace 最有效的阅读顺序：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>1. video_creation_agent 总输入输出
+2. intent_router 看 route 是否正确
+3. creative_worker 看 prompt/reply/tool_call
+4. reflection_worker 看是否拦截
+5. tool_executor 看接口入参和响应
+</code></pre></p>
 
 <p>不要一上来就看最底层 ChatOpenAI。先看业务节点 Output，通常更快。</p>
 
@@ -436,11 +544,17 @@
 
 <p>LangSmith 不是只看“模型说了什么”，而是看：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>状态是怎么变的，
+节点是怎么走的，
+工具为什么调用或没调用。
+</code></pre></p>
 
 <p>对你这个 Agent 来说，最重要的三个字段是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>route
+params.prompt
+tool_call.tool_name
+</code></pre></p>
 
 <p>只要这三个字段符合预期，大部分流程就是正常的。</p>
 

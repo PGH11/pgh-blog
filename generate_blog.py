@@ -10,7 +10,8 @@ def convert_md_to_blog_html(md_text, title, category, date, filename):
     code_blocks = []
     
     def save_code_block(match):
-        code_blocks.append(match.group(1))
+        # group(1) 是语言标识(python/text等)，group(2) 才是代码内容
+        code_blocks.append(match.group(2))
         return f'%%CODE_BLOCK_{len(code_blocks)-1}%%'
     
     md_text = re.sub(r'```(\w*)\n(.*?)```', save_code_block, md_text, flags=re.DOTALL)

@@ -73,33 +73,51 @@
 
 <p>可以理解成：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>LangChain = 模型调用层
+LangGraph = 状态机编排层
+Pydantic = 数据协议层
+Python = 业务执行层
+</code></pre></p>
 
 <h2>当前脚本的整体流程</h2>
 
 <p>用户每输入一句话，脚本会跑一次 LangGraph：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>User 输入
+  ↓
+intent_router
+  ↓
+根据 route 分支
+  ├─ chat_responder
+  └─ creative_worker
+  ↓
+END
+</code></pre></p>
 
 <p>如果用户是在闲聊，比如：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>你能帮我干嘛？
+</code></pre></p>
 
 <p>会走：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>intent_router -&gt; chat_responder -&gt; END
+</code></pre></p>
 
 <p>如果用户是在创作视频，比如：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我想生成一个关于小狗的视频
+</code></pre></p>
 
 <p>会走：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>intent_router -&gt; creative_worker -&gt; END
+</code></pre></p>
 
 <p>当用户最终确认后，CLI 会在 LangGraph 之外调用：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>call_litmedia_text_video()
+</code></pre></p>
 
 <h2>1. LangChain 在脚本里的作用</h2>
 
@@ -107,7 +125,16 @@
 
 <p>脚本里通过 <code>ChatOpenAI</code> 创建模型：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>llm = ChatOpenAI(
+    api_key=ark_api_key,
+    base_url=os.getenv(
+        "ARK_BASE_URL",
+        "https://ark.cn-beijing.volces.com/api/coding/v3",
+    ),
+    model=os.getenv("ARK_MODEL", "ark-code-latest"),
+    temperature=0,
+)
+</code></pre></p>
 
 <p>虽然类名叫 <code>ChatOpenAI</code>，但这里配置了 Ark 的 <code>base_url</code>，所以实际是通过 OpenAI 兼容协议调用 Ark 模型。</p>
 
@@ -124,7 +151,8 @@
 
 <p>LangChain 使用消息对象和模型对话：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+</code></pre></p>
 
 <p>三类消息的作用：</p>
 
@@ -136,7 +164,21 @@
 
 <p>例如 <code>creative_worker()</code> 里会构造：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages = [
+    SystemMessage(content=CREATIVE_PROMPT),
+    HumanMessage(
+        content=(
+            "当前内容参数：\n"
+            f"{current_params.model_dump_json(...)}\n\n"
+            "最近对话：\n"
+            f"{history_to_text(...)}\n\n"
+            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
+            "用户最新输入：\n"
+            f"{state['user_input']}"
+        )
+    ),
+]
+</code></pre></p>
 
 <p>这就是实际发给 AI 的上下文。</p>
 
@@ -144,7 +186,8 @@
 
 <code>chat_responder()</code> 用普通 <code>llm.invoke(messages)</code>：
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>response = llm.invoke(messages)
+</code></pre></p>
 
 <p>这种调用让 AI 自由返回一段文本，适合：</p>
 
@@ -156,7 +199,8 @@
 
 <p>返回后脚本用：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>str(response.content)
+</code></pre></p>
 
 <p>拿到回复文本。</p>
 
@@ -166,19 +210,53 @@
 
 <p>脚本里有：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>creative_llm = llm.with_structured_output(CreativeUnderstanding)
+</code></pre></p>
 
 <code>CreativeUnderstanding</code> 是 Pydantic 模型：
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class CreativeUnderstanding(BaseModel):
+    intent: Literal[
+        "chat",
+        "brainstorm",
+        "create_prompt",
+        "update_prompt",
+        "update_negative_prompt",
+        "confirm",
+        "cancel",
+    ]
+    params_patch: CreativeParamsPatch
+    merge_strategy: Literal["fill_missing", "overwrite"]
+    reply: str
+    needs_clarification: bool
+    clarification_question: str | None
+    ready_for_submit: bool
+    confirm_submit: bool
+</code></pre></p>
 
 <p>这表示 AI 必须返回类似这样的结构：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "intent": "create_prompt",
+  "params_patch": {
+    "prompt": "短腿柯基在洒满午后阳光的客厅里追彩色毛绒球...",
+    "negative_prompt": "画面昏暗、镜头剧烈晃动、场景杂乱"
+  },
+  "merge_strategy": "fill_missing",
+  "reply": "我已经帮你整理成完整视频提示词啦。",
+  "needs_clarification": false,
+  "clarification_question": null,
+  "ready_for_submit": true,
+  "confirm_submit": false
+}
+</code></pre></p>
 
 <p>这样代码可以稳定读取：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>understanding.params_patch.prompt
+understanding.ready_for_submit
+understanding.confirm_submit
+</code></pre></p>
 
 <p>这就是 <code>with_structured_output</code> 的价值。</p>
 
@@ -188,7 +266,10 @@
 
 <h3>2.1 Agent 内容参数</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class CreativeParams(BaseModel):
+    prompt: str | None = Field(default=None, description="最终视频提示词")
+    negative_prompt: str | None = Field(default=None, description="负向提示词")
+</code></pre></p>
 
 <p>这是 Agent 真正负责维护的内容。</p>
 
@@ -196,7 +277,13 @@
 
 <h3>2.2 前端 UI 参数</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class FrontendParams(BaseModel):
+    video_model: str = Field(default="54")
+    video_num: int = Field(default=1, ge=1, le=4)
+    ratio: str = Field(default="16:9")
+    quality: str = Field(default="360p")
+    duration: int = Field(default=5, ge=5, le=15)
+</code></pre></p>
 
 <p>CLI 没有前端页面，所以用 <code>FrontendParams()</code> 模拟前端已经选择好的值。</p>
 
@@ -204,17 +291,27 @@
 
 <h3>2.3 参数补丁</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class CreativeParamsPatch(BaseModel):
+    prompt: str | None = None
+    negative_prompt: str | None = None
+</code></pre></p>
 
 <p>每轮 AI 不直接改完整状态，而是返回一个“补丁”。</p>
 
 <p>例如用户说：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>改成更搞笑一点
+</code></pre></p>
 
 <p>AI 可能返回：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "params_patch": {
+    "prompt": "一只短腿柯基在客厅里追球，结果滑进抱枕堆..."
+  },
+  "merge_strategy": "overwrite"
+}
+</code></pre></p>
 
 <p>然后 Python 决定怎么把这个补丁合并进当前状态。</p>
 
@@ -224,41 +321,77 @@
 
 <h3>3.1 状态定义</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class CreativeState(TypedDict):
+    user_input: str
+    params: CreativeParams
+    chat_history: list[ChatTurn]
+    route: Literal["chat", "creative"]
+    reply: str
+    is_ready: bool
+    awaiting_confirmation: bool
+</code></pre></p>
 
 <p>这就是每一轮图执行时传来传去的状态。</p>
 
 <p>可以理解为一个字典：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "user_input": "我想生成一个关于小狗的视频",
+  "params": {
+    "prompt": null,
+    "negative_prompt": null
+  },
+  "chat_history": [],
+  "route": "chat",
+  "reply": "",
+  "is_ready": false,
+  "awaiting_confirmation": false
+}
+</code></pre></p>
 
 <p>每个节点都会读取这个状态，并返回修改后的状态。</p>
 
 <h3>3.2 创建图</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph = StateGraph(CreativeState)
+</code></pre></p>
 
 <p>这表示：我要创建一个状态图，状态结构是 <code>CreativeState</code>。</p>
 
 <h3>3.3 添加节点</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_node("intent_router", intent_router)
+graph.add_node("chat_responder", chat_responder)
+graph.add_node("creative_worker", creative_worker)
+</code></pre></p>
 
 <p>每个节点都是一个普通 Python 函数。</p>
 
 <p>节点函数的形式是：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>def node_name(state: CreativeState) -&gt; CreativeState:
+    ...
+    return new_state
+</code></pre></p>
 
 <h3>3.4 添加边</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_edge(START, "intent_router")
+</code></pre></p>
 
 <p>表示每轮开始先执行 <code>intent_router</code>。</p>
 
 <h3>3.5 条件分支</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_conditional_edges(
+    "intent_router",
+    route_by_intent,
+    {
+        "chat": "chat_responder",
+        "creative": "creative_worker",
+    },
+)
+</code></pre></p>
 
 <p>含义是：</p>
 
@@ -271,23 +404,30 @@
 
 <code>route_by_intent</code> 很简单：
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>def route_by_intent(state: CreativeState) -&gt; Literal["chat", "creative"]:
+    return state["route"]
+</code></pre></p>
 
 <p>而 <code>state["route"]</code> 是 <code>intent_router</code> 里由 AI 判断出来的。</p>
 
 <h3>3.6 结束节点</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_edge("chat_responder", END)
+graph.add_edge("creative_worker", END)
+</code></pre></p>
 
 <p>表示两个分支执行完就结束本轮图。</p>
 
 <h3>3.7 编译图</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>return graph.compile()
+</code></pre></p>
 
 <p>编译后得到可调用的 <code>app</code>：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>app = build_graph()
+state = app.invoke(state)
+</code></pre></p>
 
 <p>这时 LangGraph 会按照你定义的节点和边自动执行。</p>
 
@@ -299,19 +439,33 @@
 
 <p>输入：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>用户最新输入
+当前内容参数
+最近对话
+是否等待确认
+</code></pre></p>
 
 <p>调用：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>decision = router_llm.invoke(messages)
+</code></pre></p>
 
 <p>输出：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "creative",
+  "reason": "用户表达了视频创作需求"
+}
+</code></pre></p>
 
 <p>然后写回状态：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>return {
+    **state,
+    "route": decision.route,
+    "reply": "",
+}
+</code></pre></p>
 
 <h3>4.2 <code>chat_responder</code></h3>
 
@@ -319,15 +473,18 @@
 
 <p>例如：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>你能帮我干嘛？
+</code></pre></p>
 
 <p>这里使用普通文本模型调用：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>response = llm.invoke(messages)
+</code></pre></p>
 
 <p>然后把文本放进：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"reply": str(response.content)
+</code></pre></p>
 
 <h3>4.3 <code>creative_worker</code></h3>
 
@@ -335,89 +492,157 @@
 
 <p>例如：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我想生成一个关于小狗的视频
+</code></pre></p>
 
 <p>它会调用：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>understanding = creative_llm.invoke(messages)
+</code></pre></p>
 
 <p>因为 <code>creative_llm</code> 使用了：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>with_structured_output(CreativeUnderstanding)
+</code></pre></p>
 
 <p>所以返回的是结构化对象，而不是普通字符串。</p>
 
 <p>然后代码合并参数：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>updated_params = current_params.model_copy(deep=True)
+patch = understanding.params_patch
+allow_overwrite = understanding.merge_strategy == "overwrite"
+
+if patch.prompt and (updated_params.prompt is None or allow_overwrite):
+    updated_params.prompt = patch.prompt.strip()
+</code></pre></p>
 
 <p>如果用户明确确认：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>is_ready = bool(
+    state["awaiting_confirmation"]
+    and understanding.confirm_submit
+    and updated_params.prompt
+)
+</code></pre></p>
 
 <p>如果内容已经可提交但还没确认：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>awaiting_confirmation = bool(
+    understanding.ready_for_submit
+    and updated_params.prompt
+    and not is_ready
+)
+</code></pre></p>
 
 <h2>5. 一次完整对话是怎么跑的</h2>
 
 <p>以这段为例：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>User: 我想生成一个关于小狗的视频
+</code></pre></p>
 
 <h3>第一步：CLI 写入状态</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = {
+    **state,
+    "user_input": user_input,
+    "reply": "",
+    "is_ready": False,
+}
+</code></pre></p>
 
 <h3>第二步：调用 LangGraph</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(state)
+</code></pre></p>
 
 <h3>第三步：进入 <code>intent_router</code></h3>
 
 <p>AI 判断：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "creative",
+  "reason": "用户表达了视频创作需求"
+}
+</code></pre></p>
 
 <h3>第四步：进入 <code>creative_worker</code></h3>
 
 <p>AI 返回：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "intent": "brainstorm",
+  "params_patch": {
+    "prompt": null,
+    "negative_prompt": null
+  },
+  "reply": "我为你准备了3个不同风格的小狗视频创意方向...",
+  "needs_clarification": true,
+  "ready_for_submit": false,
+  "confirm_submit": false
+}
+</code></pre></p>
 
 <h3>第五步：CLI 打印回复并保存历史</h3>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>print(f"Agent: {state['reply']}")
+state["chat_history"].extend(
+    [
+        ChatTurn(role="user", content=user_input),
+        ChatTurn(role="assistant", content=state["reply"]),
+    ]
+)
+</code></pre></p>
 
 <h2>6. 最终确认与接口调用</h2>
 
 <p>当用户输入：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>确认生成
+</code></pre></p>
 
 <p>如果当前已经处于 <code>awaiting_confirmation=True</code>，并且 AI 返回：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "confirm_submit": true
+}
+</code></pre></p>
 
 <p>则：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>is_ready = True
+</code></pre></p>
 
 <p>循环结束：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>while not state["is_ready"]:
+    ...
+</code></pre></p>
 
 <p>然后执行：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>result = call_litmedia_text_video(state["params"], frontend_params)
+</code></pre></p>
 
 <p>这里的 <code>state["params"]</code> 是 Agent 生成的内容参数：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "prompt": "...",
+  "negative_prompt": "..."
+}
+</code></pre></p>
 
 <code>frontend_params</code> 是前端 UI 参数：
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "video_model": "54",
+  "video_num": 1,
+  "ratio": "16:9",
+  "quality": "360p",
+  "duration": 5
+}
+</code></pre></p>
 
 <p>两者合并成接口 payload。</p>
 
@@ -425,25 +650,37 @@
 
 <p>当前设计里：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>Agent 负责 prompt / negative_prompt
+前端负责 ratio / duration / model / quality / video_num
+</code></pre></p>
 
 <p>所以不会出现：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>Agent 说 9:16
+前端选 16:9
+</code></pre></p>
 
 <p>这种冲突。</p>
 
 <p>如果未来希望用户在聊天里说：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我要竖屏，5 秒
+</code></pre></p>
 
 <p>建议不要让 Agent 直接覆盖前端参数，而是返回：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "ui_params_suggestion": {
+    "ratio": "9:16",
+    "duration": 5
+  }
+}
+</code></pre></p>
 
 <p>然后前端提示用户：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>检测到你想改为竖屏 5 秒，是否应用到右侧参数？
+</code></pre></p>
 
 <p>最终仍以前端控件为准。</p>
 
@@ -451,7 +688,8 @@
 
 <p>当前脚本默认关闭调试输出：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>DEBUG_AI_OUTPUT = os.getenv("DEBUG_AI_OUTPUT", "0") != "0"
+</code></pre></p>
 
 <p>含义是：</p>
 
@@ -462,19 +700,33 @@
 
 <p>临时开启方式：</p>
 
-<p><pre><code>powershell</code></pre></p>
+<p><pre><code>$env:DEBUG_AI_OUTPUT="1"
+python image_agent.py
+</code></pre></p>
 
 <p>开启后终端会看到：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>[DEBUG] intent_router AI 返回
+[DEBUG] creative_worker AI 返回
+[DEBUG] LitMedia payload
+</code></pre></p>
 
 <p>关闭方式：</p>
 
-<p><pre><code>powershell</code></pre></p>
+<p><pre><code>$env:DEBUG_AI_OUTPUT="0"
+python image_agent.py
+</code></pre></p>
 
 <p>如果想看完整发给 AI 的上下文，可以继续扩展一个函数：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>def debug_messages(title: str, messages: list) -&gt; None:
+    if not DEBUG_AI_OUTPUT:
+        return
+    print(f"\n[DEBUG] {title}")
+    for index, message in enumerate(messages, start=1):
+        print(f"\n--- message {index}: {message.type} ---")
+        print(message.content)
+</code></pre></p>
 
 <p>然后在 <code>router_llm.invoke(messages)</code> 或 <code>creative_llm.invoke(messages)</code> 前打印。</p>
 
@@ -486,7 +738,21 @@
 
 <p>代码位置：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages = [
+    SystemMessage(content=ROUTER_PROMPT),
+    HumanMessage(
+        content=(
+            "当前内容参数：\n"
+            f"{state['params'].model_dump_json(ensure_ascii=False, exclude_none=True)}\n\n"
+            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
+            "最近对话：\n"
+            f"{history_to_text(state['chat_history'], limit=8) or '暂无'}\n\n"
+            "用户最新输入：\n"
+            f"{state['user_input']}"
+        )
+    ),
+]
+</code></pre></p>
 
 <p>AI 看到的信息包括：</p>
 
@@ -500,13 +766,32 @@
 
 <p>这个节点只负责判断：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "chat 或 creative",
+  "reason": "路由原因"
+}
+</code></pre></p>
 
 <h3>9.2 <code>chat_responder()</code> 给聊天 AI 的上下文</h3>
 
 <p>代码位置：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages = [
+    SystemMessage(
+        content=(
+            f"{CHAT_PROMPT}\n\n"
+            "当前内容参数：\n"
+            f"{state['params'].model_dump_json(ensure_ascii=False, exclude_none=True)}"
+        )
+    )
+]
+for turn in state["chat_history"][-10:]:
+    if turn.role == "user":
+        messages.append(HumanMessage(content=turn.content))
+    else:
+        messages.append(AIMessage(content=turn.content))
+messages.append(HumanMessage(content=state["user_input"]))
+</code></pre></p>
 
 <p>AI 看到的信息包括：</p>
 
@@ -519,13 +804,30 @@
 
 <p>这个节点最接近普通聊天，所以适合回答：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>你能帮我干嘛？
+你记得我刚刚说了什么吗？
+我现在的 prompt 是什么？
+</code></pre></p>
 
 <h3>9.3 <code>creative_worker()</code> 给创作 AI 的上下文</h3>
 
 <p>代码位置：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages = [
+    SystemMessage(content=CREATIVE_PROMPT),
+    HumanMessage(
+        content=(
+            "当前内容参数：\n"
+            f"{current_params.model_dump_json(ensure_ascii=False, exclude_none=True)}\n\n"
+            "最近对话：\n"
+            f"{history_to_text(state['chat_history'], limit=10) or '暂无'}\n\n"
+            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
+            "用户最新输入：\n"
+            f"{state['user_input']}"
+        )
+    ),
+]
+</code></pre></p>
 
 <p>AI 看到的信息包括：</p>
 
@@ -539,7 +841,18 @@
 
 <p>这个节点负责生成结构化结果：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "intent": "brainstorm/create_prompt/update_prompt/confirm",
+  "params_patch": {
+    "prompt": "...",
+    "negative_prompt": "..."
+  },
+  "merge_strategy": "fill_missing/overwrite",
+  "reply": "...",
+  "ready_for_submit": true,
+  "confirm_submit": false
+}
+</code></pre></p>
 
 <h2>10. <code>limit=8/10</code> 是什么</h2>
 
@@ -547,11 +860,13 @@
 
 <p>例如：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>history_to_text(state["chat_history"], limit=10)
+</code></pre></p>
 
 <p>内部实际做的是：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>history[-10:]
+</code></pre></p>
 
 <p>也就是只取最近 10 条历史。</p>
 
@@ -566,15 +881,18 @@
 
 <p>企业版常见做法是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>长期摘要 memory_summary + 最近 10-20 条原文
+</code></pre></p>
 
 <p>当前脚本还没有 <code>memory_summary</code>，只有：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>chat_history: list[ChatTurn]
+</code></pre></p>
 
 <p>所以现在 AI 主要依靠：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>当前 params + 最近若干条 chat_history
+</code></pre></p>
 
 <p>来理解上下文。</p>
 
@@ -582,21 +900,47 @@
 
 <p>当前代码里有这一段：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>router_llm = llm.with_structured_output(
+    type(
+        "RouteDecision",
+        (BaseModel,),
+        {
+            "__annotations__": {
+                "route": Literal["chat", "creative"],
+                "reason": str,
+            },
+            "route": Field(description="chat 或 creative"),
+            "reason": Field(description="路由原因"),
+        },
+    )
+)
+</code></pre></p>
 
 <p>这段是在用 Python 的 <code>type()</code> 动态创建一个 Pydantic 类。</p>
 
 <p>它等价于手写：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class RouteDecision(BaseModel):
+    route: Literal["chat", "creative"] = Field(description="chat 或 creative")
+    reason: str = Field(description="路由原因")
+
+router_llm = llm.with_structured_output(RouteDecision)
+</code></pre></p>
 
 <p>作用是要求路由 AI 返回固定结构：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "creative",
+  "reason": "用户表达了视频创作需求"
+}
+</code></pre></p>
 
 <p>从可读性上看，建议以后改成显式类：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class RouteDecision(BaseModel):
+    route: Literal["chat", "creative"] = Field(description="chat 或 creative")
+    reason: str = Field(description="路由原因")
+</code></pre></p>
 
 <p>这样比动态 <code>type(...)</code> 更适合学习和维护。</p>
 
@@ -604,19 +948,40 @@
 
 <p>当前代码里所有节点都共用同一个基础模型：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>llm = build_llm()
+router_llm = llm.with_structured_output(...)
+creative_llm = llm.with_structured_output(CreativeUnderstanding)
+</code></pre></p>
 
 <p>如果想不同节点用不同模型，可以把 <code>build_llm()</code> 改成支持传模型名：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>def build_llm(model: str | None = None) -&gt; ChatOpenAI:
+    ark_api_key = os.getenv("ARK_API_KEY") or DEFAULT_ARK_API_KEY
+
+    return ChatOpenAI(
+        api_key=ark_api_key,
+        base_url=os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/coding/v3"),
+        model=model or os.getenv("ARK_MODEL", "ark-code-latest"),
+        temperature=0,
+    )
+</code></pre></p>
 
 <p>然后分别创建：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>router_base_llm = build_llm(os.getenv("ARK_ROUTER_MODEL", "ark-code-latest"))
+chat_llm = build_llm(os.getenv("ARK_CHAT_MODEL", "ark-code-latest"))
+creative_base_llm = build_llm(os.getenv("ARK_CREATIVE_MODEL", "ark-code-latest"))
+
+router_llm = router_base_llm.with_structured_output(RouteDecision)
+creative_llm = creative_base_llm.with_structured_output(CreativeUnderstanding)
+</code></pre></p>
 
 <p>对应关系可以是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>intent_router：快模型、便宜模型
+chat_responder：普通对话模型
+creative_worker：创作能力更强的模型
+</code></pre></p>
 
 <h2>13. 最终接口调用不在 LangGraph 里</h2>
 
@@ -624,11 +989,17 @@
 
 <p>真正调用接口发生在 <code>run_cli()</code> 循环结束后：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>while not state["is_ready"]:
+    ...
+
+result = call_litmedia_text_video(state["params"], frontend_params)
+</code></pre></p>
 
 <p>也就是说：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>LangGraph：负责让用户确认 prompt / negative_prompt
+普通 Python：负责合并前端参数、签名、请求 LitMedia
+</code></pre></p>
 
 <p>这样做的好处是：</p>
 
@@ -666,7 +1037,8 @@
 
 <p>LangGraph 让每轮流程固定：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>先路由，再执行对应节点
+</code></pre></p>
 
 <p>不会让一个节点同时承担所有逻辑。</p>
 
@@ -690,15 +1062,18 @@
 
 <p>这一节专门整理你刚才问到的几个关键点：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(state)
+</code></pre></p>
 
 <p>以及：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"route": decision.route
+</code></pre></p>
 
 <p>和：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>route_by_intent(state)
+</code></pre></p>
 
 <h3>16.1 <code>state</code> 是什么</h3>
 
@@ -706,27 +1081,57 @@
 
 <p>它的结构由 <code>CreativeState</code> 定义：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>class CreativeState(TypedDict):
+    user_input: str
+    params: CreativeParams
+    chat_history: list[ChatTurn]
+    route: Literal["chat", "creative"]
+    reply: str
+    is_ready: bool
+    awaiting_confirmation: bool
+</code></pre></p>
 
 <p>初始化时在 <code>run_cli()</code> 里：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state: CreativeState = {
+    "user_input": "",
+    "params": CreativeParams(),
+    "chat_history": [],
+    "route": "chat",
+    "reply": "",
+    "is_ready": False,
+    "awaiting_confirmation": False,
+}
+</code></pre></p>
 
 <p>可以把它理解成 Agent 当前这一轮的“工作台”：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>用户最新说了什么？
+当前 prompt 是什么？
+历史对话有哪些？
+本轮要走 chat 还是 creative？
+最终要回复用户什么？
+是否已经确认生成？
+</code></pre></p>
 
 <h3>16.2 每轮用户输入后，先更新 <code>state</code></h3>
 
 <p>用户输入后，CLI 会先把最新输入写进状态：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = {
+    **state,
+    "user_input": user_input,
+    "reply": "",
+    "is_ready": False,
+}
+</code></pre></p>
 
 <p>这里的 <code>**state</code> 表示复制旧状态。</p>
 
 <p>然后后面的字段会覆盖旧值：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"user_input": user_input
+</code></pre></p>
 
 <p>表示把用户这次新输入写入状态。</p>
 
@@ -734,21 +1139,34 @@
 
 <code>app</code> 是由：
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>app = build_graph()
+</code></pre></p>
 
 <p>创建出来的 LangGraph 可执行对象。</p>
 
 <p>所以：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(state)
+</code></pre></p>
 
 <p>意思是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>把当前 state 交给 LangGraph 跑一遍状态机，
+然后把 LangGraph 返回的新 state 覆盖回原来的 state。
+</code></pre></p>
 
 <p>你的图结构是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>START
+  ↓
+intent_router
+  ↓
+根据 route 分支
+  ├─ chat_responder
+  └─ creative_worker
+  ↓
+END
+</code></pre></p>
 
 <p>因此 <code>app.invoke(state)</code> 实际会做：</p>
 
@@ -766,29 +1184,46 @@
 
 <p>写入位置在 <code>intent_router()</code> 的返回值里：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>return {
+    **state,
+    "route": decision.route,
+    "reply": "",
+}
+</code></pre></p>
 
 <p>其中：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>decision = router_llm.invoke(messages)
+</code></pre></p>
 
 <p>是 AI 返回的路由判断。</p>
 
 <p>例如 AI 返回：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "creative",
+  "reason": "用户表达了视频创作需求"
+}
+</code></pre></p>
 
 <p>那么：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"route": decision.route
+</code></pre></p>
 
 <p>就等价于：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"route": "creative"
+</code></pre></p>
 
 <p>所以这个 return 实际是在说：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>return {
+    **state,
+    "route": "creative",
+    "reply": "",
+}
+</code></pre></p>
 
 <p>这就是把 AI 判断出来的路由写入 <code>state["route"]</code>。</p>
 
@@ -796,65 +1231,109 @@
 
 <p>函数本身很简单：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>def route_by_intent(state: CreativeState) -&gt; Literal["chat", "creative"]:
+    return state["route"]
+</code></pre></p>
 
 <p>它只做一件事：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>读取 state["route"] 并返回。
+</code></pre></p>
 
 <p>真正使用它的是这段：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_conditional_edges(
+    "intent_router",
+    route_by_intent,
+    {
+        "chat": "chat_responder",
+        "creative": "creative_worker",
+    },
+)
+</code></pre></p>
 
 <p>含义是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>intent_router 执行完以后，
+LangGraph 调用 route_by_intent(state)，
+如果返回 chat，就去 chat_responder，
+如果返回 creative，就去 creative_worker。
+</code></pre></p>
 
 <h3>16.6 一个完整例子</h3>
 
 <p>假设用户输入：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我想做一个小狗视频
+</code></pre></p>
 
 <p>执行前状态可能是：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = {
+    "user_input": "我想做一个小狗视频",
+    "params": CreativeParams(prompt=None, negative_prompt=None),
+    "chat_history": [],
+    "route": "chat",
+    "reply": "",
+    "is_ready": False,
+    "awaiting_confirmation": False,
+}
+</code></pre></p>
 
 <p>然后执行：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(state)
+</code></pre></p>
 
 <p>第一步进入 <code>intent_router()</code>。</p>
 
 <p>AI 返回：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "creative",
+  "reason": "用户表达了视频创作需求"
+}
+</code></pre></p>
 
 <code>intent_router()</code> 返回的新状态里：
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"route": "creative"
+</code></pre></p>
 
 <p>然后 LangGraph 调用：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>route_by_intent(state)
+</code></pre></p>
 
 <p>返回：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"creative"
+</code></pre></p>
 
 <p>于是 LangGraph 进入：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>creative_worker(state)
+</code></pre></p>
 
 <code>creative_worker</code> 可能返回：
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = {
+    "user_input": "我想做一个小狗视频",
+    "params": CreativeParams(prompt=None, negative_prompt=None),
+    "chat_history": [],
+    "route": "creative",
+    "reply": "我给你准备了 3 个小狗视频方向...",
+    "is_ready": False,
+    "awaiting_confirmation": False,
+}
+</code></pre></p>
 
 <p>最后 <code>app.invoke(state)</code> 把这个最终状态返回给 CLI。</p>
 
 <p>CLI 再打印：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>print(f"Agent: {state['reply']}")
+</code></pre></p>
 
 <h3>16.7 为什么要写成 <code>state = app.invoke(state)</code></h3>
 
@@ -864,11 +1343,13 @@
 
 <p>所以你必须写：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(state)
+</code></pre></p>
 
 <p>而不是只写：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>app.invoke(state)
+</code></pre></p>
 
 <p>如果只写 <code>app.invoke(state)</code>，图虽然执行了，但你没有保存返回的新状态，后续循环里就拿不到新的 <code>reply</code>、<code>params</code>、<code>awaiting_confirmation</code>。</p>
 
@@ -876,11 +1357,16 @@
 
 <p>可以记成：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>节点函数负责改 state
+边负责决定下一个节点
+app.invoke(state) 负责运行整张图
+state = app.invoke(state) 负责保存运行后的结果
+</code></pre></p>
 
 <p>更短一点：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>state 进去，state 出来。
+</code></pre></p>
 
 <h2>17. 每轮对话流程节点总览</h2>
 
@@ -890,11 +1376,39 @@
 
 <p>当前脚本每一轮对话的流程是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>用户输入
+  ↓
+run_cli() 读取 input()
+  ↓
+把 user_input 写入 state
+  ↓
+state = app.invoke(state)
+  ↓
+LangGraph START
+  ↓
+intent_router
+  ↓
+route_by_intent(state)
+  ↓
+根据 state["route"] 分支
+  ├─ chat      -&gt; chat_responder  -&gt; END
+  └─ creative  -&gt; creative_worker -&gt; END
+  ↓
+app.invoke(state) 返回新 state
+  ↓
+run_cli() 打印 state["reply"]
+  ↓
+把 user / assistant 写入 chat_history
+  ↓
+如果 state["is_ready"] = True
+  ↓
+退出循环，调用 LitMedia 接口
+</code></pre></p>
 
 <p>最核心的一句话是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>每轮对话 = 先路由，再执行对应业务节点，最后返回更新后的 state。
+</code></pre></p>
 
 <h2>17.2 每个节点做什么</h2>
 
@@ -914,19 +1428,28 @@
 
 <p>代码在 <code>run_cli()</code> 里：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>user_input = input("User: ").strip()
+</code></pre></p>
 
 <p>如果用户输入：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我想生成一个关于小狗的视频
+</code></pre></p>
 
 <p>那么：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>user_input = "我想生成一个关于小狗的视频"
+</code></pre></p>
 
 <p>然后代码把它写入 <code>state</code>：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = {
+    **state,
+    "user_input": user_input,
+    "reply": "",
+    "is_ready": False,
+}
+</code></pre></p>
 
 <p>这一步还没有调用 AI，只是更新状态。</p>
 
@@ -934,11 +1457,13 @@
 
 <p>代码：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(state)
+</code></pre></p>
 
 <p>意思是：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>把当前 state 交给 LangGraph，让它按 build_graph() 定义的图跑一遍。
+</code></pre></p>
 
 <p>此时 LangGraph 会从 <code>START</code> 开始。</p>
 
@@ -946,99 +1471,168 @@
 
 <p>图里定义了：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_edge(START, "intent_router")
+</code></pre></p>
 
 <p>所以第一站一定是：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>intent_router(state)
+</code></pre></p>
 
 <p>这个节点会组装给 AI 的上下文：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages = [
+    SystemMessage(content=ROUTER_PROMPT),
+    HumanMessage(
+        content=(
+            "当前内容参数：\n"
+            f"{state['params'].model_dump_json(...)}\n\n"
+            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
+            "最近对话：\n"
+            f"{history_to_text(state['chat_history'], limit=8) or '暂无'}\n\n"
+            "用户最新输入：\n"
+            f"{state['user_input']}"
+        )
+    ),
+]
+</code></pre></p>
 
 <p>然后调用路由 AI：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>decision = router_llm.invoke(messages)
+</code></pre></p>
 
 <p>AI 返回类似：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "route": "creative",
+  "reason": "用户表达了视频创作需求"
+}
+</code></pre></p>
 
 <p>然后写回 state：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>return {
+    **state,
+    "route": decision.route,
+    "reply": "",
+}
+</code></pre></p>
 
 <p>这里最重要的是：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"route": decision.route
+</code></pre></p>
 
 <p>它把 AI 返回的 <code>"creative"</code> 写入了：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state["route"]
+</code></pre></p>
 
 <h2>17.6 第 4 步：条件分支</h2>
 
 <p>图里定义了：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_conditional_edges(
+    "intent_router",
+    route_by_intent,
+    {
+        "chat": "chat_responder",
+        "creative": "creative_worker",
+    },
+)
+</code></pre></p>
 
 <p>这表示：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>intent_router 执行完后，调用 route_by_intent(state)。
+</code></pre></p>
 
 <code>route_by_intent</code> 是：
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>def route_by_intent(state: CreativeState) -&gt; Literal["chat", "creative"]:
+    return state["route"]
+</code></pre></p>
 
 <p>它不调用 AI，也不改状态，只读：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state["route"]
+</code></pre></p>
 
 <p>如果它返回：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"chat"
+</code></pre></p>
 
 <p>LangGraph 走：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>chat_responder
+</code></pre></p>
 
 <p>如果它返回：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"creative"
+</code></pre></p>
 
 <p>LangGraph 走：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>creative_worker
+</code></pre></p>
 
 <h2>17.7 第 5A 步：如果走 <code>chat_responder</code></h2>
 
 <p>适合这些输入：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>你能帮我干嘛？
+你记得我刚刚说了什么吗？
+我现在的 prompt 是什么？
+</code></pre></p>
 
 <p>代码会构造聊天上下文：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages = [
+    SystemMessage(
+        content=(
+            f"{CHAT_PROMPT}\n\n"
+            "当前内容参数：\n"
+            f"{state['params'].model_dump_json(...)}"
+        )
+    )
+]
+</code></pre></p>
 
 <p>然后把最近历史加入：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>for turn in state["chat_history"][-10:]:
+    if turn.role == "user":
+        messages.append(HumanMessage(content=turn.content))
+    else:
+        messages.append(AIMessage(content=turn.content))
+</code></pre></p>
 
 <p>最后追加本轮输入：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages.append(HumanMessage(content=state["user_input"]))
+</code></pre></p>
 
 <p>调用 AI：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>response = llm.invoke(messages)
+</code></pre></p>
 
 <p>写回 state：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>return {
+    **state,
+    "reply": str(response.content),
+    "is_ready": False,
+}
+</code></pre></p>
 
 <p>这个分支执行完后：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_edge("chat_responder", END)
+</code></pre></p>
 
 <p>本轮结束。</p>
 
@@ -1046,45 +1640,100 @@
 
 <p>适合这些输入：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>我想生成一个关于小狗的视频
+第二种
+改成更搞笑一点
+确认生成
+</code></pre></p>
 
 <p>代码会构造创作上下文：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>messages = [
+    SystemMessage(content=CREATIVE_PROMPT),
+    HumanMessage(
+        content=(
+            "当前内容参数：\n"
+            f"{current_params.model_dump_json(...)}\n\n"
+            "最近对话：\n"
+            f"{history_to_text(state['chat_history'], limit=10) or '暂无'}\n\n"
+            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
+            "用户最新输入：\n"
+            f"{state['user_input']}"
+        )
+    ),
+]
+</code></pre></p>
 
 <p>调用结构化 AI：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>understanding = creative_llm.invoke(messages)
+</code></pre></p>
 
 <p>这里的 <code>creative_llm</code> 是：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>creative_llm = llm.with_structured_output(CreativeUnderstanding)
+</code></pre></p>
 
 <p>所以 AI 必须返回 <code>CreativeUnderstanding</code> 结构。</p>
 
 <p>例如：</p>
 
-<p><pre><code>json</code></pre></p>
+<p><pre><code>{
+  "intent": "create_prompt",
+  "params_patch": {
+    "prompt": "短腿柯基在阳光客厅里追彩色毛绒球...",
+    "negative_prompt": "画面昏暗、镜头剧烈晃动、场景杂乱"
+  },
+  "merge_strategy": "fill_missing",
+  "reply": "我已经帮你整理成完整视频提示词啦。",
+  "ready_for_submit": true,
+  "confirm_submit": false
+}
+</code></pre></p>
 
 <p>然后代码合并参数：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>updated_params = current_params.model_copy(deep=True)
+patch = understanding.params_patch
+allow_overwrite = understanding.merge_strategy == "overwrite"
+
+if patch.prompt and (updated_params.prompt is None or allow_overwrite):
+    updated_params.prompt = patch.prompt.strip()
+</code></pre></p>
 
 <p>如果用户已经确认提交：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>is_ready = bool(
+    state["awaiting_confirmation"]
+    and understanding.confirm_submit
+    and updated_params.prompt
+)
+</code></pre></p>
 
 <p>如果内容已经准备好，但还没最终确认：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>awaiting_confirmation = bool(
+    understanding.ready_for_submit
+    and updated_params.prompt
+    and not is_ready
+)
+</code></pre></p>
 
 <p>最后写回 state：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>return {
+    **state,
+    "params": updated_params,
+    "reply": understanding.reply,
+    "is_ready": is_ready,
+    "awaiting_confirmation": awaiting_confirmation,
+}
+</code></pre></p>
 
 <p>这个分支执行完后：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>graph.add_edge("creative_worker", END)
+</code></pre></p>
 
 <p>本轮结束。</p>
 
@@ -1092,11 +1741,13 @@
 
 <p>不管走 <code>chat_responder</code> 还是 <code>creative_worker</code>，最后都会到：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>END
+</code></pre></p>
 
 <p>然后：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state = app.invoke(state)
+</code></pre></p>
 
 <p>右边的 <code>app.invoke(state)</code> 返回最终状态。</p>
 
@@ -1108,7 +1759,8 @@
 
 <p>图执行完后，CLI 打印：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>print(f"Agent: {state['reply']}")
+</code></pre></p>
 
 <p>这个 <code>reply</code> 来自：</p>
 
@@ -1121,7 +1773,13 @@
 
 <p>打印后，CLI 会保存本轮用户输入和助手回复：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>state["chat_history"].extend(
+    [
+        ChatTurn(role="user", content=user_input),
+        ChatTurn(role="assistant", content=state["reply"]),
+    ]
+)
+</code></pre></p>
 
 <p>这一步非常重要。</p>
 
@@ -1133,23 +1791,28 @@
 
 <p>循环条件是：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>while not state["is_ready"]:
+</code></pre></p>
 
 <p>如果 <code>creative_worker()</code> 返回：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>"is_ready": True
+</code></pre></p>
 
 <p>循环结束。</p>
 
 <p>然后执行：</p>
 
-<p><pre><code>python</code></pre></p>
+<p><pre><code>result = call_litmedia_text_video(state["params"], frontend_params)
+</code></pre></p>
 
 <p>这里不再是 LangGraph 节点，而是普通 Python 业务逻辑。</p>
 
 <p>参数来源：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>state["params"]：Agent 生成的 prompt / negative_prompt
+frontend_params：前端选择的模型、比例、时长、清晰度、数量
+</code></pre></p>
 
 <p>合并后请求 LitMedia。</p>
 
@@ -1165,11 +1828,18 @@
 
 <h2>17.14 你可以这样记</h2>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>run_cli 负责循环
+app.invoke 负责跑图
+intent_router 负责分流
+chat_responder 负责聊天
+creative_worker 负责创作
+call_litmedia_text_video 负责提交接口
+</code></pre></p>
 
 <p>更短的记法：</p>
 
-<p><pre><code>text</code></pre></p>
+<p><pre><code>输入 -&gt; 写 state -&gt; 跑图 -&gt; 更新 state -&gt; 打印 reply -&gt; 保存历史 -&gt; 必要时调接口
+</code></pre></p>
 
         </div>
     </article>
