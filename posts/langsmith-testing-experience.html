@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangSmith 测试经验：Agent 追踪与排查实战 | PGH Blog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://pgh11.github.io/pgh-blog/styles.css">
+    <style>
+        .post-header { padding: 160px 24px 60px; background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), var(--bg-primary); }
+        .post-container { max-width: 800px; margin: 0 auto; }
+        .post-title { font-size: 42px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; }
+        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+        .post-category { padding: 6px 16px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .post-date { color: var(--text-tertiary); font-size: 15px; }
+        .post-content { padding: 40px 24px 80px; }
+        .post-content h2 { font-size: 28px; font-weight: 600; margin: 40px 0 20px; color: var(--text-primary); }
+        .post-content h3 { font-size: 22px; font-weight: 600; margin: 32px 0 16px; color: var(--text-primary); }
+        .post-content p { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; font-size: 17px; }
+        .post-content ul { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
+        .post-content ol { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
+        .post-content li { margin-bottom: 12px; font-size: 17px; }
+        .post-content code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #3b82f6; }
+        .post-content pre { background: var(--bg-secondary); padding: 20px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; }
+        .post-content pre code { background: none; padding: 0; color: var(--text-primary); font-size: 14px; line-height: 1.8; }
+        .post-content blockquote { border-left: 4px solid #3b82f6; padding-left: 20px; margin: 24px 0; color: var(--text-tertiary); font-style: italic; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #3b82f6; text-decoration: none; font-weight: 500; margin-bottom: 32px; transition: transform 0.3s ease; }
+        .back-btn:hover { transform: translateX(-4px); }
+        @media (max-width: 768px) { .post-title { font-size: 32px; } }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" id="themeToggle">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line></svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </div>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="https://pgh11.github.io/pgh-blog/index.html" class="logo">PGH<span class="dot">.</span></a>
+            <ul class="nav-links">
+                <li><a href="https://pgh11.github.io/pgh-blog/index.html">首页</a></li>
+                <li><a href="https://pgh11.github.io/pgh-blog/blog.html" class="active">博客</a></li>
+                <li><a href="https://pgh11.github.io/pgh-blog/projects.html">项目</a></li>
+            </ul>
+            <div class="hamburger"><span></span><span></span><span></span></div>
+        </div>
+    </nav>
+    <section class="post-header">
+        <div class="post-container">
+            <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
+            <h1 class="post-title">LangSmith 测试经验：Agent 追踪与排查实战</h1>
+            <div class="post-meta"><span class="post-category">AI 测试</span><span class="post-date">2026年5月12日</span></div>
+        </div>
+    </section>
+    <article class="post-content">
+        <div class="post-container">
+            <h2>LangSmith 测试经验</h2>
+
+<p>这份文档记录当前视频创作 Agent 接入 LangSmith 后，怎么观察、怎么排查、怎么判断一次对话是不是正常。内容以 <code>image_agent.py</code> 的实际结构为准。</p>
+
+<h2>1. 先看项目是否接对</h2>
+
+<p>当前脚本里硬编码了：</p>
+
+<p><pre><code>python</code></pre></p>
+
+<p>所以 trace 应该出现在 LangSmith 的：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>如果看不到数据，先检查这几件事：</p>
+
+<ul>
+<li>运行的是当前这份 <code>image_agent.py</code>。</li>
+<li><code>LANGSMITH_API_KEY_VALUE</code> 已经填了真实 key。</li>
+<li><code>configure_langsmith()</code> 在模型初始化之前执行。</li>
+<li>页面左侧选的是 <code>Tracing</code>，不是 <code>Monitoring</code>。</li>
+<li>项目名是 <code>test</code>，不是之前的 <code>litmedia-video-agent</code>。</li>
+</ul>
+
+<p>LangSmith 有时会有几秒延迟，运行完一轮对话后可以刷新一下页面。</p>
+
+<h2>2. 一条 trace 对应什么</h2>
+
+<p>现在代码里每次执行：</p>
+
+<p><pre><code>python</code></pre></p>
+
+<p>所以 LangSmith 里一条 <code>video_creation_agent</code> 基本对应一次用户输入。</p>
+
+<p>比如用户连续输入三次：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>通常就会看到三条 <code>video_creation_agent</code> run。</p>
+
+<h2>3. 左侧树结构怎么看</h2>
+
+<p>点开一条 trace，左侧会出现类似结构：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>不一定每次都有所有节点。</p>
+
+<p>常见情况：</p>
+
+<ul>
+<li>闲聊问题：通常是 <code>intent_router -> chat_responder</code>。</li>
+<li>创作问题：通常是 <code>intent_router -> creative_worker -> reflection_worker</code>。</li>
+<li>确认生成：如果工具调用没被反思节点拦截，会出现 <code>tool_executor</code>。</li>
+</ul>
+
+<h2>4. 每个节点重点看什么</h2>
+
+<h3>4.1 <code>video_creation_agent</code></h3>
+
+<p>这是整轮对话的总入口。</p>
+
+<p>先看这里可以快速知道：</p>
+
+<ul>
+<li>用户这一轮输入是什么。</li>
+<li>最终输出给用户的回复是什么。</li>
+<li>这轮有没有报错。</li>
+<li>总耗时是多少。</li>
+</ul>
+
+<p>如果只想快速判断这轮是否正常，先看最外层就够。</p>
+
+<h3>4.2 <code>intent_router</code></h3>
+
+<p>这个节点负责判断路由：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>重点看 Output 里的：</p>
+
+<p><pre><code>json</code></pre></p>
+
+<p>排查方式：</p>
+
+<ul>
+<li>用户问“你能帮我干嘛”，应该是 <code>chat</code>。</li>
+<li>用户说“我想做一个小狗视频”，应该是 <code>creative</code>。</li>
+<li>用户说“确认生成”，如果正在等待确认，应该是 <code>creative</code>。</li>
+</ul>
+
+<p>如果路由错了，优先改 <code>ROUTER_PROMPT</code>，不要急着改后面的节点。</p>
+
+<h3>4.3 <code>route_by_intent</code></h3>
+
+<p>这个节点不调用模型，只读：</p>
+
+<p><pre><code>python</code></pre></p>
+
+<p>它耗时通常接近 0。</p>
+
+<p>如果它出问题，一般不是 AI 问题，而是 <code>intent_router</code> 写入的 <code>route</code> 不对，或者映射表没有覆盖对应 route。</p>
+
+<h3>4.4 <code>chat_responder</code></h3>
+
+<p>这个节点处理闲聊、能力介绍、上下文问答。</p>
+
+<p>重点看：</p>
+
+<ul>
+<li>Input 里的 <code>chat_history</code> 是否带上了最近对话。</li>
+<li>Input 里的 <code>params</code> 是否包含当前 prompt。</li>
+<li>Output 里的 <code>reply</code> 是否回答了用户的问题。</li>
+</ul>
+
+<p>典型测试：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>如果它答非所问，通常是上下文给得不够，或者 <code>CHAT_PROMPT</code> 约束不清。</p>
+
+<h3>4.5 <code>creative_worker</code></h3>
+
+<p>这是最核心的创作节点。</p>
+
+<p>重点看 Output：</p>
+
+<p><pre><code>json</code></pre></p>
+
+<p>检查点：</p>
+
+<ul>
+<li>用户只说“小狗视频”时，不应该直接提交，应该给创意方向。</li>
+<li>用户选择“第一个”时，应该整理出完整 prompt。</li>
+<li>用户说“改成更搞笑”，应该覆盖旧 prompt。</li>
+<li>用户确认生成时，才应该出现 <code>tool_call.tool_name = submit_video_generation</code>。</li>
+</ul>
+
+<p>如果 prompt 太泛，就改 <code>CREATIVE_PROMPT</code> 的创作标准。</p>
+
+<p>如果工具调用太早，就改 <code>CREATIVE_PROMPT</code> 里关于 <code>tool_call</code> 的规则。</p>
+
+<h3>4.6 <code>reflection_worker</code></h3>
+
+<p>这个节点是安全检查层。</p>
+
+<p>它负责判断：</p>
+
+<ul>
+<li>prompt 是否太泛。</li>
+<li>用户是否真的确认提交。</li>
+<li>reply 有没有提前说“已经生成成功”。</li>
+<li>tool_call 是否应该被阻止。</li>
+</ul>
+
+<p>重点看 Output：</p>
+
+<p><pre><code>json</code></pre></p>
+
+<p>如果它阻止了工具调用，通常会看到：</p>
+
+<p><pre><code>json</code></pre></p>
+
+<p>这个节点很适合排查“为什么没有调用接口”。</p>
+
+<h3>4.7 <code>tool_executor</code></h3>
+
+<p>只有 Agent 决定调用工具，且反思节点没有阻止时，才会进入这里。</p>
+
+<p>重点看：</p>
+
+<ul>
+<li><code>tool_name</code> 是否是 <code>submit_video_generation</code>。</li>
+<li>tool 入参里的 <code>prompt</code> 是否正确。</li>
+<li>前端 UI 参数是否合并正确。</li>
+<li>接口返回是否成功。</li>
+</ul>
+
+<p>如果没看到 <code>tool_executor</code>，说明还没真正提交。</p>
+
+<p>排查顺序：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<h2>5. Input / Output 怎么看</h2>
+
+<p>每个节点右侧都有 <code>Input</code> 和 <code>Output</code>。</p>
+
+<h3>Input</h3>
+
+<p>Input 是节点执行前拿到的状态。</p>
+
+<p>常见字段：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>看 Input 是为了确认：</p>
+
+<ul>
+<li>上一轮状态有没有保存下来。</li>
+<li>当前 prompt 是否已经存在。</li>
+<li>当前是不是等待确认状态。</li>
+<li>前端参数是否正确。</li>
+</ul>
+
+<h3>Output</h3>
+
+<p>Output 是节点执行后返回的新状态。</p>
+
+<p>看 Output 是为了确认：</p>
+
+<ul>
+<li>这一步有没有更新 prompt。</li>
+<li>有没有生成 reply。</li>
+<li>有没有设置 awaiting_confirmation。</li>
+<li>有没有设置 tool_call。</li>
+<li>有没有进入 is_ready。</li>
+</ul>
+
+<h2>6. 什么时候看 ChatOpenAI 子节点</h2>
+
+<p>如果只看业务流程，通常看父节点 Output 就够。</p>
+
+<p>需要深入排查模型输入输出时，再点 <code>ChatOpenAI</code>：</p>
+
+<ul>
+<li>Input：真实发给模型的 messages。</li>
+<li>Output：模型原始响应。</li>
+</ul>
+
+<p>尤其是排查这些问题时要看 <code>ChatOpenAI</code>：</p>
+
+<ul>
+<li>AI 为什么判断成 <code>chat</code>。</li>
+<li>AI 为什么没有提取 prompt。</li>
+<li>AI 为什么没有设置 <code>tool_call</code>。</li>
+<li>AI 为什么误以为已经确认。</li>
+</ul>
+
+<p>注意：<code>creative_worker</code> 使用了 <code>with_structured_output</code>，所以 LangSmith 里可能会显示：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>这是正常的。结构化输出内部会有一层 runnable 包装。</p>
+
+<h2>7. 常见问题排查</h2>
+
+<h3>7.1 看不到 trace</h3>
+
+<p>检查：</p>
+
+<ul>
+<li>项目名是不是 <code>test</code>。</li>
+<li><code>LANGSMITH_API_KEY_VALUE</code> 有没有填真实 key。</li>
+<li>是否重新启动了脚本。</li>
+<li>是否在 <code>Tracing</code> 页面，而不是 <code>Monitoring</code> 页面。</li>
+</ul>
+
+<h3>7.2 route 错了</h3>
+
+<p>看：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>如果 <code>route</code> 错，改：</p>
+
+<p><pre><code>python</code></pre></p>
+
+<p>不要先改 <code>creative_worker</code>。</p>
+
+<h3>7.3 prompt 没更新</h3>
+
+<p>看：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>如果 <code>params.prompt</code> 没变，再看：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>判断是模型没返回，还是合并逻辑没覆盖。</p>
+
+<h3>7.4 工具没调用</h3>
+
+<p>按顺序看：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>常见原因：</p>
+
+<ul>
+<li>用户没有明确确认。</li>
+<li>prompt 太泛，被反思节点拦截。</li>
+<li><code>tool_call.tool_name</code> 是 <code>none</code>。</li>
+</ul>
+
+<h3>7.5 工具调用了但接口失败</h3>
+
+<p>看：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>以及：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>重点检查：</p>
+
+<ul>
+<li>token 是否有效。</li>
+<li>signature 是否生成。</li>
+<li>prompt 是否为空。</li>
+<li>UI 参数是否合理。</li>
+<li>接口返回的错误 body。</li>
+</ul>
+
+<h2>8. 建议的测试用例</h2>
+
+<p>每次改 prompt 或节点逻辑后，建议固定跑这些用例。</p>
+
+<h3>闲聊</h3>
+
+<p><pre><code>text</code></pre></p>
+
+<p>预期：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<h3>泛创意</h3>
+
+<p><pre><code>text</code></pre></p>
+
+<p>预期：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<h3>选择方案</h3>
+
+<p><pre><code>text</code></pre></p>
+
+<p>预期：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<h3>修改 prompt</h3>
+
+<p><pre><code>text</code></pre></p>
+
+<p>预期：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<h3>确认生成</h3>
+
+<p><pre><code>text</code></pre></p>
+
+<p>预期：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<h3>未确认时问状态</h3>
+
+<p><pre><code>text</code></pre></p>
+
+<p>预期：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<h2>9. 推荐看 trace 的顺序</h2>
+
+<p>一条 trace 最有效的阅读顺序：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>不要一上来就看最底层 ChatOpenAI。先看业务节点 Output，通常更快。</p>
+
+<h2>10. 一句话经验</h2>
+
+<p>LangSmith 不是只看“模型说了什么”，而是看：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>对你这个 Agent 来说，最重要的三个字段是：</p>
+
+<p><pre><code>text</code></pre></p>
+
+<p>只要这三个字段符合预期，大部分流程就是正常的。</p>
+
+        </div>
+    </article>
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo">PGH<span class="dot">.</span></span>
+                    <p class="footer-tagline">用代码保障质量，用测试守护体验</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>导航</h4>
+                        <a href="https://pgh11.github.io/pgh-blog/index.html">首页</a>
+                        <a href="https://pgh11.github.io/pgh-blog/blog.html">博客</a>
+                        <a href="https://pgh11.github.io/pgh-blog/projects.html">项目</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社交</h4>
+                        <a href="https://github.com/PGH11" target="_blank">GitHub</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 PGH. All rights reserved. Built with &#10084;&#65039;</p>
+            </div>
+        </div>
+    </footer>
+    <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
+</body>
+</html>
