@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill 测试实战：从脚本到 Agent 的分层验收方法 | PGH Blog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://pgh11.github.io/pgh-blog/styles.css">
+    <style>
+        .post-header { padding: 160px 24px 60px; background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), var(--bg-primary); }
+        .post-container { max-width: 800px; margin: 0 auto; }
+        .post-title { font-size: 42px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; }
+        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+        .post-category { padding: 6px 16px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .post-date { color: var(--text-tertiary); font-size: 15px; }
+        .post-content { padding: 40px 24px 80px; }
+        .post-content h2 { font-size: 28px; font-weight: 600; margin: 40px 0 20px; color: var(--text-primary); }
+        .post-content h3 { font-size: 22px; font-weight: 600; margin: 32px 0 16px; color: var(--text-primary); }
+        .post-content p { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; font-size: 17px; }
+        .post-content ul { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
+        .post-content ol { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
+        .post-content li { margin-bottom: 12px; font-size: 17px; }
+        .post-content code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #3b82f6; }
+        .post-content pre { background: var(--bg-secondary); padding: 20px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; }
+        .post-content pre code { background: none; padding: 0; color: var(--text-primary); font-size: 14px; line-height: 1.8; }
+        .post-content blockquote { border-left: 4px solid #3b82f6; padding-left: 20px; margin: 24px 0; color: var(--text-tertiary); font-style: italic; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #3b82f6; text-decoration: none; font-weight: 500; margin-bottom: 32px; transition: transform 0.3s ease; }
+        .back-btn:hover { transform: translateX(-4px); }
+        @media (max-width: 768px) { .post-title { font-size: 32px; } }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" id="themeToggle">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line></svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </div>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="https://pgh11.github.io/pgh-blog/index.html" class="logo">PGH<span class="dot">.</span></a>
+            <ul class="nav-links">
+                <li><a href="https://pgh11.github.io/pgh-blog/index.html">首页</a></li>
+                <li><a href="https://pgh11.github.io/pgh-blog/blog.html" class="active">博客</a></li>
+                <li><a href="https://pgh11.github.io/pgh-blog/projects.html">项目</a></li>
+            </ul>
+            <div class="hamburger"><span></span><span></span><span></span></div>
+        </div>
+    </nav>
+    <section class="post-header">
+        <div class="post-container">
+            <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
+            <h1 class="post-title">Skill 测试实战：从脚本到 Agent 的分层验收方法</h1>
+            <div class="post-meta"><span class="post-category">AI 测试</span><span class="post-date">2026年5月13日</span></div>
+        </div>
+    </section>
+    <article class="post-content">
+        <div class="post-container">
+            <h2>Skill 测试实战：从脚本到 Agent 的分层验收方法</h2>
+
+<p>这篇文章记录在「视频创作 Agent」项目中，怎么把 Skill（脚本 + API 封装）和 Agent（LangGraph 图编排）拆开测试，最终合到一起验收。核心思路：<strong>底座先绿，再上编排</strong>。</p>
+
+<p>---</p>
+
+<h2>一、为什么要分层测 Skill</h2>
+
+<p>Skill 是能力层：真正发起 HTTP、处理 multipart、解析返回、落盘下载的都在这里。Agent 是调度层：它决定读哪份 <code>SKILL.md</code>、调哪个脚本、参数怎么拼。</p>
+
+<p>如果一上来只让 Agent 发起「帮我做个视频」，一旦失败，你根本分不清是：</p>
+
+<ul>
+<li>意图没识别对；</li>
+<li>环境变量里的 access key 没配好；</li>
+<li>API 返回字段变了，脚本解析挂了；</li>
+<li>网络或鉴权 401；</li>
+<li>还是下载 URL 本身需要特殊 header。</li>
+</ul>
+
+<strong>先把脚本在终端里跑通</strong>，等于把问题先压缩到「API + 解析 + 文件 IO」这一层；再上 Agent，这时只剩「识别与编排」两类问题，排障会快一个数量级。
+
+<p>类比：先确认发动机和油管没问题，再让「自动驾驶」上路；否则出了事故你都不知道是车坏了还是导航错了。</p>
+
+<p>---</p>
+
+<h2>二、当前项目的 Skill 架构</h2>
+
+<p>当前 <code>video_agent</code> 包里，和 Skill 相关的核心模块：</p>
+
+<p><pre><code>video_agent/
+├── litmedia_client.py    # @tool 装饰的提交工具（submit_text_to_video / submit_image_to_video）
+├── memory_store.py       # 长期记忆 JSON 读写
+├── rag_service.py        # 本地 Markdown 关键词检索
+├── settings.py           # 常量与配置（endpoint、密钥、文件路径等）
+</code></pre></p>
+
+<p>从外部 API 角度看，当前 Agent 暴露了两个核心 Skill：</p>
+
+
+
+
+
+
+<p>---</p>
+
+<h2>三、四层测试模型</h2>
+
+<h3>第 1 层：静态与参数层（几乎零成本）</h3>
+
+<ul>
+<li><code>python -m py_compile</code> 把所有脚本过一遍，消灭语法和 import 级错误。</li>
+<li>每个入口 <code>--help</code> 看一遍，确认必填参数和文档一致。</li>
+<li>检查 <code>settings.py</code> 里的默认值是否合理（如 <code>MEMORY_FILE</code>、<code>KNOWLEDGE_DIR</code> 路径是否存在）。</li>
+</ul>
+
+<p>这一层的目标是：<strong>别让低级错误混进集成测试</strong>。</p>
+
+<h3>第 2 层：负向与边界层（不依赖真实创作成功）</h3>
+
+<ul>
+<li>不配 <code>ARK_API_KEY</code> 时是否明确提示「请设置环境变量」。</li>
+<li>不配 LitMedia token 时 <code>submit_text_to_video</code> 是否报错而不是静默失败。</li>
+<li>缺必填参数（如 <code>prompt</code> 为空）是否在 <code>route_after_reflection</code> 被拦截。</li>
+<li>上传不存在的图片 URL 时图生路径是否正确降级。</li>
+<li><code>memory_store.py</code> 的 <code>user_memory.json</code> 不存在或格式损坏时是否能自动修复/重建。</li>
+</ul>
+
+<p>好的失败信息能省掉大量「用户在群里问为什么没反应」的时间。</p>
+
+<h3>第 3 层：平台 API 与闭环层（真链路的验收）</h3>
+
+<p>按能力拆开测：</p>
+
+<ul>
+<li><strong><code>submit_text_to_video</code></strong>：能否返回有效的 task_id，接口是否 200。</li>
+<li><strong><code>submit_image_to_video</code></strong>：给合法图片 URL 时能否正常提交，缺图 URL 时是否失败。</li>
+<li><strong><code>memory_store</code></strong>：读写 <code>user_memory.json</code> 是否正常，旧版格式能否自动迁移（<code>migrate_legacy_memory</code>）。</li>
+<li><strong><code>rag_service</code></strong>：<code>knowledge/*.md</code> 存在时能否检索到相关片段，不存在时是否返回空列表而不是报错。</li>
+</ul>
+
+<strong>很关键的一点</strong>：<code>rag_service</code> 的检索逻辑可以用本地 Markdown 文件测，不必依赖外部服务。这样「检索逻辑」和「外部 API」解耦。
+
+<p>再手工跑一遍<strong>完整闭环</strong>：提交 → （可能轮询状态）→ 确认接口返回。若这一步不靠 Agent 也能走通，说明底座是稳的。</p>
+
+<h3>第 4 层：Agent 与 Skill 层（意图识别 ≠ 有回复）</h3>
+
+<p>很多人把「Agent 回话了」当成测试通过。更硬的标准是一条链：</p>
+
+<p>> 自然语言 → 是否命中 skill → 是否选对工作流 → 是否调对工具 → 参数是否对齐 → 用户是否看到结果。</p>
+
+<p>举例：</p>
+
+<ul>
+<li>「生成一张小猫图片」→ 应调 <code>submit_text_to_video</code>，且 <code>prompt</code> 应保持用户意图，不要 AI 擅自加「电影级、8K、超写实」这类词——若 <code>CREATIVE_PROMPT</code> 里写了「只做传话」，这就是回归项。</li>
+<li>「用这张图 https://xxx.png 做个视频」→ 应走 <code>i2v</code> 路径，先 <code>asset_resolver</code> 解析 URL，再调 <code>submit_image_to_video</code>，且 <code>img_url</code> 应对上。</li>
+<li>「确认生成」但还没 <code>awaiting_confirmation</code> → 不应走到 <code>tool_executor</code>，应被 <code>reflection_worker</code> 拦截。</li>
+</ul>
+
+<code>SKILL.md</code> 不是玄学 prompt 工程，而是<strong>产品规格书</strong>：<code>description</code> 决定「什么时候该被选中」，正文里的原则决定「选中以后该怎么干」。测试时要专门设一批<strong>触发句式 + 必须执行的动作</strong>，做成小矩阵，比单靠感觉聊天靠谱得多。
+
+<p>---</p>
+
+<h2>四、当前项目的特殊测试点</h2>
+
+<h3>4.1 文生 vs 图生工具的区分</h3>
+
+<p>当前代码有两个工具：<code>submit_text_to_video</code> 和 <code>submit_image_to_video</code>。</p>
+
+<p>测试时需要确认：</p>
+
+<ul>
+<li>文生路径不会误调 <code>submit_image_to_video</code>。</li>
+<li>图生路径不会误调 <code>submit_text_to_video</code>（<code>i2v_worker</code> 里会纠正这种错误）。</li>
+<li><code>route_after_reflection</code> 的判定逻辑：图生需要同时满足 <code>prompt</code> 非空和 <code>source_image_url</code> 非空。</li>
+</ul>
+
+<h3>4.2 结构化输出空返回</h3>
+
+<p>模型偶发返回 <code>None</code>。当前代码用 <code>invoke_structured_with_recovery</code> 三层治理：</p>
+
+<ul>
+<li>主路径正常返回。</li>
+<li>第一次为空：追加 HumanMessage 重试。</li>
+<li>仍为空：降级为澄清回复。</li>
+</ul>
+
+<p>测试时可以人为触发空返回（比如临时把模型返回 mock 为 None），验证：</p>
+
+<ul>
+<li>图不会崩掉。</li>
+<li>用户看到的是一条合理的追问，不是报错。</li>
+<li>DEBUG 日志里有 <code>structured_output_observation</code> 记录。</li>
+</ul>
+
+<h3>4.3 长期记忆的读写</h3>
+
+<code>memory_store.py</code> 的几个边界：
+
+<ul>
+<li>文件不存在时自动创建空结构。</li>
+<li>旧版 5 个数组格式能自动迁移到 <code>memories</code> 条目结构。</li>
+<li><code>confirmed_prompt</code> 类别只保留最近 5 条。</li>
+<li><code>memory_id_for</code> 生成稳定 id，同一条记忆不会重复写入。</li>
+</ul>
+
+<h3>4.4 RAG 检索</h3>
+
+<code>rag_service.py</code> 的几个边界：
+
+<ul>
+<li><code>knowledge/</code> 目录不存在时返回空列表。</li>
+<li>中文分词：<code>tokenize_for_rag</code> 会按 2 字粒度切中文，并有同义词扩展。</li>
+<li><code>split_markdown_sections</code>：过长片段会按 <code>RAG_CHUNK_MAX_CHARS</code> 再切。</li>
+</ul>
+
+<p>---</p>
+
+<h2>五、容易被忽略的坑</h2>
+
+<h3>上传返回值字段名</h3>
+
+<p>文档里可能叫 <code>asset_id</code>，代码里若取的是平台返回的另一个字段，一联调就会「上传成功但下游不认」。这类问题必须在「上传 + 带 asset 提交」这一条用例里显式验掉。</p>
+
+<h3>结构化输出 method 不匹配</h3>
+
+<code>langchain_openai</code> 版本不同，<code>with_structured_output()</code> 的默认 <code>method</code> 可能从 <code>function_calling</code> 变成 <code>json_schema</code>。如果底层模型不支持 <code>json_schema</code>，就会 400。<strong>当前代码显式写 <code>method="function_calling"</code></strong>，测试时要确认这一点没被改掉。
+
+<h3>图生路径缺图</h3>
+
+<p>图生路径有三层保护：<code>i2v_worker</code> 压 tool → <code>reflection_worker</code> 硬拦截 → <code>route_after_reflection</code> 三重检查。测试时要专门验证缺图场景不会误提交。</p>
+
+<h3>记忆噪声</h3>
+
+<code>memory_writer</code> 如果没有门槛，会把所有一次性对话都写进长期记忆。当前代码里是模型判断 + Python 置信度门槛。测试时要验证"你叫什么名字"这类闲聊不会写进记忆。
+
+<h3>FrontendParams 新增字段</h3>
+
+<p>当前 <code>FrontendParams</code> 比 <code>CreativeParams</code> 多了 <code>open_filter</code>、<code>sound_effect_switch</code>、<code>seed</code>、<code>is_feed</code> 等字段。这些字段在工具调用时需要合并到 payload 里。测试时要确认这些字段没有被漏掉。</p>
+
+<p>---</p>
+
+<h2>六、推荐执行顺序（checklist）</h2>
+
+<ul>
+<li>全脚本 <code>py_compile</code> + import 验证。</li>
+<li>不配 key、缺参数、坏 URL 等负向用例。</li>
+<li><code>memory_store.py</code>：空文件/损坏文件/旧版格式的读写。</li>
+<li><code>rag_service.py</code>：无 knowledge 目录/有目录的关键词检索。</li>
+<li><code>litmedia_client.py</code>：最小文生 + 图生冒烟。</li>
+<li>手工闭环：提交 → 检查接口返回。</li>
+<li>图路径层：覆盖 chat / creative / i2v 三条主要分支。</li>
+<li>结构化输出：验证重试和降级。</li>
+<li>记忆写入：验证写入门槛和裁剪逻辑。</li>
+<li>最后才是 Agent：用固定话术矩阵测触发与工作流。</li>
+</ul>
+
+<p>---</p>
+
+<h2>七、小结</h2>
+
+<strong>Skill 测试的本质是分层验收</strong>：脚本保证「机器和 API 说得通」，Agent 测试保证「人和意图被正确翻译成那几行命令」。两层都绿，再说「Skill 已生产就绪」才站得住脚。
+
+<p>若要把这套东西产品化，可以把「意图矩阵」和「手工命令 checklist」放进仓库，每次发版前 CI 跑静态层，发版后人工或半自动跑一层 API 冒烟——这比赌一次「让模型随便聊聊」要可靠得多。</p>
+
+<p>---</p>
+
+<strong>关联文档</strong>
+
+<ul>
+<li>[<code>AGENT_TESTING_BLOG.md</code>](./AGENT_TESTING_BLOG.md)：Agent 图编排层测试（状态和分支验收）</li>
+<li>[<code>LangSmith_测试经验.md</code>](./LangSmith_测试经验.md)：tracing 树上每个节点看什么</li>
+<li>[<code>LangGraph_LangChain_学习笔记.md</code>](./LangGraph_LangChain_学习笔记.md)：实现与概念</li>
+</ul>
+
+        </div>
+    </article>
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo">PGH<span class="dot">.</span></span>
+                    <p class="footer-tagline">用代码保障质量，用测试守护体验</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>导航</h4>
+                        <a href="https://pgh11.github.io/pgh-blog/index.html">首页</a>
+                        <a href="https://pgh11.github.io/pgh-blog/blog.html">博客</a>
+                        <a href="https://pgh11.github.io/pgh-blog/projects.html">项目</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社交</h4>
+                        <a href="https://github.com/PGH11" target="_blank">GitHub</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 PGH. All rights reserved. Built with &#10084;&#65039;</p>
+            </div>
+        </div>
+    </footer>
+    <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
+</body>
+</html>
