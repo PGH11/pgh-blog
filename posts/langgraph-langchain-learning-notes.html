@@ -54,11 +54,11 @@
             <div class="post-meta"><span class="post-category">AI 开发</span><span class="post-date">2026年5月12日</span></div>
         </div>
     </section>
-    <article class="post-content">
+        <article class="post-content">
         <div class="post-container">
             <h2>LangGraph 与 LangChain 学习笔记</h2>
 
-<p>这份文档结合当前目录里的 <code>image_agent.py</code>，解释脚本里 LangChain 和 LangGraph 分别做什么，以及一次用户对话是怎么被送进 AI、怎么更新状态、怎么最终调用接口的。</p>
+<p>这份文档结合当前目录里的 <code>video_agent</code> 包（根目录 <code>image_agent.py</code> 为兼容入口），解释 LangChain 和 LangGraph 分别做什么，以及一次用户对话是怎么被送进 AI、怎么更新状态、怎么最终调用接口的。</p>
 
 <h2>一句话理解</h2>
 
@@ -85,13 +85,22 @@ Python = 业务执行层
 
 <p><pre><code>User 输入
   ↓
+memory_retriever → retrieval_router → [rag_retriever | skip]
+  ↓
 intent_router
   ↓
 根据 route 分支
-  ├─ chat_responder
-  └─ creative_worker
+  ├─ chat      → chat_responder
+  ├─ creative  → creative_worker
+  └─ i2v       → asset_resolver → i2v_worker
   ↓
-END
+creative/i2v → reflection_worker
+  ↓
+根据 route_after_reflection 分支
+  ├─ tool  → tool_executor
+  └─ end   → memory_writer
+  ↓
+memory_writer → END
 </code></pre></p>
 
 <p>如果用户是在闲聊，比如：</p>
@@ -101,7 +110,7 @@ END
 
 <p>会走：</p>
 
-<p><pre><code>intent_router -&gt; chat_responder -&gt; END
+<p><pre><code>memory_retriever → retrieval_router → intent_router → chat_responder → memory_writer → END
 </code></pre></p>
 
 <p>如果用户是在创作视频，比如：</p>
@@ -111,13 +120,15 @@ END
 
 <p>会走：</p>
 
-<p><pre><code>intent_router -&gt; creative_worker -&gt; END
+<p><pre><code>memory_retriever → retrieval_router → intent_router → creative_worker → reflection_worker → memory_writer → END
 </code></pre></p>
 
-<p>当用户最终确认后，CLI 会在 LangGraph 之外调用：</p>
+<p>当用户最终确认后，LangGraph 会继续进入工具节点：</p>
 
-<p><pre><code>call_litmedia_text_video()
+<p><pre><code>... → creative_worker → reflection_worker → tool_executor → memory_writer → END
 </code></pre></p>
+
+<p>图生路径类似，只是把 <code>creative_worker</code> 换成 <code>asset_resolver → i2v_worker</code>。</p>
 
 <h2>1. LangChain 在脚本里的作用</h2>
 
@@ -194,7 +205,7 @@ END
 <ul>
 <li>闲聊</li>
 <li>能力介绍</li>
-<li>回答“你记得我刚刚说了什么吗”</li>
+<li>回答"你记得我刚刚说了什么吗"</li>
 </ul>
 
 <p>返回后脚本用：</p>
@@ -208,23 +219,39 @@ END
 
 <p>创作节点不是让 AI 随便返回文本，而是要求 AI 返回固定结构。</p>
 
-<p>脚本里有：</p>
+<p>脚本里所有结构化输出都显式指定 <code>method</code>：</p>
 
-<p><pre><code>creative_llm = llm.with_structured_output(CreativeUnderstanding)
+<p><pre><code>router_llm = llm.with_structured_output(RouteDecision, method="function_calling")
+creative_llm = llm.with_structured_output(CreativeUnderstanding, method="function_calling")
+reflection_llm = llm.with_structured_output(ReflectionResult, method="function_calling")
+memory_llm = llm.with_structured_output(MemoryWriteDecision, method="function_calling")
+retrieval_llm = llm.with_structured_output(RetrievalDecision, method="function_calling")
 </code></pre></p>
+
+<p>这里要特别注意 <code>method</code> 参数。</p>
+
+<code>with_structured_output()</code> 在 <code>langchain_openai >= 0.2</code> 里默认是：
+
+<p><pre><code>method="json_schema"
+</code></pre></p>
+
+<p>如果底层模型或 OpenAI 兼容服务不支持 <code>response_format.type=json_schema</code>，就会报类似错误：</p>
+
+<p><pre><code>InvalidParameter: response_format.type=json_schema is not supported by this model
+</code></pre></p>
+
+<strong>当前脚本走的是 Ark OpenAI 兼容接口，所以显式写 <code>method="function_calling"</code> 更稳。</strong> 这样仍然由 LangChain 负责结构化输出和 Pydantic 校验，但不会依赖模型服务支持 <code>json_schema</code> 响应格式。
+
+<p>不同环境安装的 langchain-openai 版本可能不同，默认值可能从 <code>function_calling</code> 变成 <code>json_schema</code>。这就是为什么"公司能用家里不能用"——同样的代码和模型，只是包版本不同。</p>
 
 <code>CreativeUnderstanding</code> 是 Pydantic 模型：
 
 <p><pre><code>class CreativeUnderstanding(BaseModel):
     intent: Literal[
-        "chat",
-        "brainstorm",
-        "create_prompt",
-        "update_prompt",
-        "update_negative_prompt",
-        "confirm",
-        "cancel",
+        "chat", "brainstorm", "create_prompt", "update_prompt",
+        "update_negative_prompt", "confirm", "cancel",
     ]
+    generation_mode: Literal["text_to_video", "image_to_video"]
     params_patch: CreativeParamsPatch
     merge_strategy: Literal["fill_missing", "overwrite"]
     reply: str
@@ -232,12 +259,14 @@ END
     clarification_question: str | None
     ready_for_submit: bool
     confirm_submit: bool
+    tool_call: ToolCallRequest
 </code></pre></p>
 
 <p>这表示 AI 必须返回类似这样的结构：</p>
 
 <p><pre><code>{
   "intent": "create_prompt",
+  "generation_mode": "text_to_video",
   "params_patch": {
     "prompt": "短腿柯基在洒满午后阳光的客厅里追彩色毛绒球...",
     "negative_prompt": "画面昏暗、镜头剧烈晃动、场景杂乱"
@@ -247,7 +276,11 @@ END
   "needs_clarification": false,
   "clarification_question": null,
   "ready_for_submit": true,
-  "confirm_submit": false
+  "confirm_submit": false,
+  "tool_call": {
+    "tool_name": "none",
+    "reason": "用户尚未明确确认"
+  }
 }
 </code></pre></p>
 
@@ -256,24 +289,46 @@ END
 <p><pre><code>understanding.params_patch.prompt
 understanding.ready_for_submit
 understanding.confirm_submit
+understanding.tool_call.tool_name
 </code></pre></p>
 
-<p>这就是 <code>with_structured_output</code> 的价值。</p>
+<p>这就是 <code>with_structured_output</code> 的价值：代码仍然拿到 Pydantic 对象，但底层结构化方式要和模型能力匹配。</p>
+
+<h3>1.5 结构化输出空返回的治理</h3>
+
+<p>模型偶发返回空结构化结果（运行时变成 <code>None</code>）。当前代码用 <code>invoke_structured_with_recovery</code> 处理：</p>
+
+<p><pre><code>raw_output = runnable.invoke(messages)
+if raw_output is not None:
+    return raw_output
+
+# 第一次为空：追加一条要求重试
+retry_messages = [*messages, HumanMessage(content="恢复要求：你上一条结构化输出为空。请严格按既定 schema 返回一个合法对象，不要返回 null。")]
+retry_output = runnable.invoke(retry_messages)
+if retry_output is not None:
+    return retry_output
+
+# 仍为空：返回 None，由节点降级处理
+return None
+</code></pre></p>
+
+<p>节点拿到 <code>None</code> 后，用 <code>ensure_creative_understanding</code> 兜底，再调用 <code>generate_clarification_reply</code> 动态生成澄清回复。</p>
+
+<p>观测上，可以在 DEBUG 或 LangSmith 里看到 <code>structured_output_observation</code> 日志，区分「首空」「重试恢复」「二次仍空」。</p>
 
 <h2>2. Pydantic 在脚本里的作用</h2>
 
-<p>Pydantic 用来定义“数据协议”。</p>
+<p>Pydantic 用来定义"数据协议"。</p>
 
 <h3>2.1 Agent 内容参数</h3>
 
 <p><pre><code>class CreativeParams(BaseModel):
     prompt: str | None = Field(default=None, description="最终视频提示词")
     negative_prompt: str | None = Field(default=None, description="负向提示词")
+    source_image_url: str | None = Field(default=None, description="图生视频的参考图 URL")
 </code></pre></p>
 
-<p>这是 Agent 真正负责维护的内容。</p>
-
-<p>注意：比例、时长、模型、清晰度这些已经不属于 Agent 内容参数，而是交给前端。</p>
+<p>这是 Agent 真正负责维护的内容。注意 <code>source_image_url</code> 是图生视频的参考图，属于内容参数而非 UI 参数。</p>
 
 <h3>2.2 前端 UI 参数</h3>
 
@@ -283,37 +338,33 @@ understanding.confirm_submit
     ratio: str = Field(default="16:9")
     quality: str = Field(default="360p")
     duration: int = Field(default=5, ge=5, le=15)
+    open_filter: int = Field(default=0, ge=0, le=1)
+    sound_effect_switch: int = Field(default=1, ge=0, le=1)
+    seed: str = Field(default="")
+    is_feed: int = Field(default=0, ge=0, le=1)
 </code></pre></p>
 
 <p>CLI 没有前端页面，所以用 <code>FrontendParams()</code> 模拟前端已经选择好的值。</p>
-
-<p>未来接真实前端时，可以把页面选中的参数传进来，替换这个默认对象。</p>
 
 <h3>2.3 参数补丁</h3>
 
 <p><pre><code>class CreativeParamsPatch(BaseModel):
     prompt: str | None = None
     negative_prompt: str | None = None
+    source_image_url: str | None = None
 </code></pre></p>
 
-<p>每轮 AI 不直接改完整状态，而是返回一个“补丁”。</p>
+<p>每轮 AI 不直接改完整状态，而是返回一个"补丁"。</p>
 
-<p>例如用户说：</p>
+<h3>2.4 工具调用决策</h3>
 
-<p><pre><code>改成更搞笑一点
+<p><pre><code>class ToolCallRequest(BaseModel):
+    tool_name: Literal["none", "submit_text_to_video", "submit_image_to_video"]
+    reason: str = ""
+    arguments: SubmitVideoGenerationInput | SubmitImageToVideoInput | None = None
 </code></pre></p>
 
-<p>AI 可能返回：</p>
-
-<p><pre><code>{
-  "params_patch": {
-    "prompt": "一只短腿柯基在客厅里追球，结果滑进抱枕堆..."
-  },
-  "merge_strategy": "overwrite"
-}
-</code></pre></p>
-
-<p>然后 Python 决定怎么把这个补丁合并进当前状态。</p>
+<p>旧版只有一个 <code>submit_video_generation</code>，现在拆成文生和图生两个。</p>
 
 <h2>3. LangGraph 在脚本里的作用</h2>
 
@@ -324,216 +375,172 @@ understanding.confirm_submit
 <p><pre><code>class CreativeState(TypedDict):
     user_input: str
     params: CreativeParams
+    frontend_params: FrontendParams
     chat_history: list[ChatTurn]
-    route: Literal["chat", "creative"]
+    long_term_memory: str
+    should_retrieve: bool
+    retrieval_query: str
+    rag_context: str
+    rag_sources: list[str]
+    resolved_image_url: str
+    route: Literal["chat", "creative", "i2v"]
     reply: str
     is_ready: bool
     awaiting_confirmation: bool
+    tool_call: ToolCallRequest
+    reflection_passed: bool
+    reflection_issues: list[str]
 </code></pre></p>
 
 <p>这就是每一轮图执行时传来传去的状态。</p>
-
-<p>可以理解为一个字典：</p>
-
-<p><pre><code>{
-  "user_input": "我想生成一个关于小狗的视频",
-  "params": {
-    "prompt": null,
-    "negative_prompt": null
-  },
-  "chat_history": [],
-  "route": "chat",
-  "reply": "",
-  "is_ready": false,
-  "awaiting_confirmation": false
-}
-</code></pre></p>
-
-<p>每个节点都会读取这个状态，并返回修改后的状态。</p>
 
 <h3>3.2 创建图</h3>
 
 <p><pre><code>graph = StateGraph(CreativeState)
 </code></pre></p>
 
-<p>这表示：我要创建一个状态图，状态结构是 <code>CreativeState</code>。</p>
-
 <h3>3.3 添加节点</h3>
 
-<p><pre><code>graph.add_node("intent_router", intent_router)
+<p><pre><code>graph.add_node("memory_retriever", memory_retriever)
+graph.add_node("retrieval_router", retrieval_router)
+graph.add_node("rag_retriever", rag_retriever)
+graph.add_node("intent_router", intent_router)
 graph.add_node("chat_responder", chat_responder)
 graph.add_node("creative_worker", creative_worker)
-</code></pre></p>
-
-<p>每个节点都是一个普通 Python 函数。</p>
-
-<p>节点函数的形式是：</p>
-
-<p><pre><code>def node_name(state: CreativeState) -&gt; CreativeState:
-    ...
-    return new_state
+graph.add_node("asset_resolver", asset_resolver)
+graph.add_node("i2v_worker", i2v_worker)
+graph.add_node("reflection_worker", reflection_worker)
+graph.add_node("tool_executor", tool_executor)
+graph.add_node("memory_writer", memory_writer)
 </code></pre></p>
 
 <h3>3.4 添加边</h3>
 
-<p><pre><code>graph.add_edge(START, "intent_router")
+<p><pre><code>graph.add_edge(START, "memory_retriever")
+graph.add_edge("memory_retriever", "retrieval_router")
 </code></pre></p>
-
-<p>表示每轮开始先执行 <code>intent_router</code>。</p>
 
 <h3>3.5 条件分支</h3>
 
-<p><pre><code>graph.add_conditional_edges(
+<p>当前图有三处条件边：</p>
+
+<p><pre><code># 检索路由
+graph.add_conditional_edges(
+    "retrieval_router",
+    route_after_retrieval,
+    {
+        "retrieve": "rag_retriever",
+        "skip": "intent_router",
+    },
+)
+
+# 意图路由
+graph.add_conditional_edges(
     "intent_router",
     route_by_intent,
     {
         "chat": "chat_responder",
         "creative": "creative_worker",
+        "i2v": "asset_resolver",
+    },
+)
+
+# 反思后路由
+graph.add_conditional_edges(
+    "reflection_worker",
+    route_after_reflection,
+    {
+        "tool": "tool_executor",
+        "end": "memory_writer",
     },
 )
 </code></pre></p>
 
-<p>含义是：</p>
-
-<ul>
-<li>执行完 <code>intent_router</code>。</li>
-<li>调用 <code>route_by_intent(state)</code>。</li>
-<li>如果返回 <code>"chat"</code>，走 <code>chat_responder</code>。</li>
-<li>如果返回 <code>"creative"</code>，走 <code>creative_worker</code>。</li>
-</ul>
-
-<code>route_by_intent</code> 很简单：
-
-<p><pre><code>def route_by_intent(state: CreativeState) -&gt; Literal["chat", "creative"]:
-    return state["route"]
-</code></pre></p>
-
-<p>而 <code>state["route"]</code> 是 <code>intent_router</code> 里由 AI 判断出来的。</p>
-
 <h3>3.6 结束节点</h3>
 
-<p><pre><code>graph.add_edge("chat_responder", END)
-graph.add_edge("creative_worker", END)
-</code></pre></p>
+<p>所有分支最终都汇入 <code>memory_writer</code>，再由 <code>memory_writer</code> 到 <code>END</code>：</p>
 
-<p>表示两个分支执行完就结束本轮图。</p>
+<p><pre><code>graph.add_edge("chat_responder", "memory_writer")
+graph.add_edge("tool_executor", "memory_writer")
+graph.add_edge("memory_writer", END)
+</code></pre></p>
 
 <h3>3.7 编译图</h3>
 
 <p><pre><code>return graph.compile()
 </code></pre></p>
 
-<p>编译后得到可调用的 <code>app</code>：</p>
+<h2>4. 核心节点</h2>
 
-<p><pre><code>app = build_graph()
-state = app.invoke(state)
-</code></pre></p>
+<h3>4.1 <code>memory_retriever</code></h3>
 
-<p>这时 LangGraph 会按照你定义的节点和边自动执行。</p>
+<p>职责：读取本地 <code>user_memory.json</code>，把长期记忆注入本轮上下文。</p>
 
-<h2>4. 三个核心节点</h2>
+<p>每个节点后续都能从 <code>state["long_term_memory"]</code> 读取。</p>
 
-<h3>4.1 <code>intent_router</code></h3>
+<h3>4.2 <code>retrieval_router</code></h3>
 
-<p>职责：判断这句话走聊天，还是走创作。</p>
+<p>职责：用结构化模型判断本轮是否需要 RAG 检索。</p>
 
-<p>输入：</p>
+<p>写入 <code>should_retrieve</code>、<code>retrieval_query</code>；同时清空上轮的 <code>rag_context</code>。</p>
 
-<p><pre><code>用户最新输入
-当前内容参数
-最近对话
-是否等待确认
-</code></pre></p>
+<h3>4.3 <code>rag_retriever</code></h3>
 
-<p>调用：</p>
+<p>职责：当 <code>should_retrieve=True</code> 时，走本地 Markdown 关键词匹配检索。</p>
 
-<p><pre><code>decision = router_llm.invoke(messages)
-</code></pre></p>
+<p>把检索结果写入 <code>rag_context</code> 和 <code>rag_sources</code>。</p>
 
-<p>输出：</p>
+<h3>4.4 <code>intent_router</code></h3>
 
-<p><pre><code>{
-  "route": "creative",
-  "reason": "用户表达了视频创作需求"
-}
-</code></pre></p>
+<p>职责：判断这句话走聊天、创作还是图生。</p>
 
-<p>然后写回状态：</p>
+<p>有<strong>Python 快捷路径</strong>：用户输入含图片 URL 且命中「图生」类关键词时，直接设 <code>route="i2v"</code>，不调模型。</p>
 
-<p><pre><code>return {
-    **state,
-    "route": decision.route,
-    "reply": "",
-}
-</code></pre></p>
+<p>否则调 <code>router_llm</code>，在 <code>chat</code> / <code>creative</code> / <code>i2v</code> 里选一个。</p>
 
-<h3>4.2 <code>chat_responder</code></h3>
+<h3>4.5 <code>chat_responder</code></h3>
 
 <p>职责：处理闲聊、能力介绍、上下文问答。</p>
 
-<p>例如：</p>
+<p>使用普通文本模型调用，不经过 <code>reflection_worker</code>。</p>
 
-<p><pre><code>你能帮我干嘛？
-</code></pre></p>
+<h3>4.6 <code>creative_worker</code></h3>
 
-<p>这里使用普通文本模型调用：</p>
+<p>职责：文生视频的创作核心节点。</p>
 
-<p><pre><code>response = llm.invoke(messages)
-</code></pre></p>
+<p>调用 <code>creative_llm</code> 结构化输出，处理 <code>params</code>、<code>reply</code>、<code>awaiting_confirmation</code>、<code>tool_call</code> 等。</p>
 
-<p>然后把文本放进：</p>
+<h3>4.7 <code>asset_resolver</code> / <code>i2v_worker</code></h3>
 
-<p><pre><code>"reply": str(response.content)
-</code></pre></p>
+<p>职责：图生视频路径。</p>
 
-<h3>4.3 <code>creative_worker</code></h3>
+<ul>
+<li><code>asset_resolver</code>：从用户输入等来源解析图片 URL。</li>
+<li><code>i2v_worker</code>：图生专用结构化节点（独立 prompt <code>I2V_PROMPT</code>），产出与 <code>creative_worker</code> 类似的状态字段。缺图时会压掉提交类 <code>tool_call</code>。</li>
+</ul>
 
-<p>职责：处理创作任务。</p>
+<h3>4.8 <code>reflection_worker</code></h3>
 
-<p>例如：</p>
+<p>职责：二次审查，可改 <code>reply</code>、清空或保留 <code>tool_call</code>。</p>
 
-<p><pre><code>我想生成一个关于小狗的视频
-</code></pre></p>
+<p>图生路径有额外硬拦截：<code>tool_call</code> 是 <code>submit_image_to_video</code> 但 <code>source_image_url</code> 为空时，强制 <code>should_block_tool=True</code>。</p>
 
-<p>它会调用：</p>
+<h3>4.9 <code>tool_executor</code></h3>
 
-<p><pre><code>understanding = creative_llm.invoke(messages)
-</code></pre></p>
+<p>职责：按 <code>tool_call.tool_name</code> 调文生或图生工具。</p>
 
-<p>因为 <code>creative_llm</code> 使用了：</p>
+<p>当前支持两种工具：</p>
 
-<p><pre><code>with_structured_output(CreativeUnderstanding)
-</code></pre></p>
+<ul>
+<li><code>submit_text_to_video</code>：文生视频</li>
+<li><code>submit_image_to_video</code>：图生视频</li>
+</ul>
 
-<p>所以返回的是结构化对象，而不是普通字符串。</p>
+<h3>4.10 <code>memory_writer</code></h3>
 
-<p>然后代码合并参数：</p>
+<p>职责：每轮收尾，AI 决定是否写入长期记忆，再由 Python 合并、裁剪、落盘。</p>
 
-<p><pre><code>updated_params = current_params.model_copy(deep=True)
-patch = understanding.params_patch
-allow_overwrite = understanding.merge_strategy == "overwrite"
-
-if patch.prompt and (updated_params.prompt is None or allow_overwrite):
-    updated_params.prompt = patch.prompt.strip()
-</code></pre></p>
-
-<p>如果用户明确确认：</p>
-
-<p><pre><code>is_ready = bool(
-    state["awaiting_confirmation"]
-    and understanding.confirm_submit
-    and updated_params.prompt
-)
-</code></pre></p>
-
-<p>如果内容已经可提交但还没确认：</p>
-
-<p><pre><code>awaiting_confirmation = bool(
-    understanding.ready_for_submit
-    and updated_params.prompt
-    and not is_ready
-)
-</code></pre></p>
+<strong>所有分支最终都会经过 <code>memory_writer</code></strong>，包括闲聊和工具执行后。
 
 <h2>5. 一次完整对话是怎么跑的</h2>
 
@@ -548,16 +555,30 @@ if patch.prompt and (updated_params.prompt is None or allow_overwrite):
     **state,
     "user_input": user_input,
     "reply": "",
+    "long_term_memory": "",
+    "should_retrieve": False,
+    "retrieval_query": "",
+    "rag_context": "",
+    "rag_sources": [],
+    "resolved_image_url": "",
     "is_ready": False,
+    "tool_call": ToolCallRequest(),
+    "reflection_passed": True,
+    "reflection_issues": [],
 }
 </code></pre></p>
 
 <h3>第二步：调用 LangGraph</h3>
 
-<p><pre><code>state = app.invoke(state)
+<p><pre><code>state = app.invoke(state, config={...})
 </code></pre></p>
 
-<h3>第三步：进入 <code>intent_router</code></h3>
+<h3>第三步：公共前缀</h3>
+
+<p><pre><code>memory_retriever → retrieval_router → [rag_retriever | skip] → intent_router
+</code></pre></p>
+
+<h3>第四步：进入 <code>intent_router</code></h3>
 
 <p>AI 判断：</p>
 
@@ -567,397 +588,210 @@ if patch.prompt and (updated_params.prompt is None or allow_overwrite):
 }
 </code></pre></p>
 
-<h3>第四步：进入 <code>creative_worker</code></h3>
+<h3>第五步：进入 <code>creative_worker</code></h3>
 
 <p>AI 返回：</p>
 
 <p><pre><code>{
   "intent": "brainstorm",
-  "params_patch": {
-    "prompt": null,
-    "negative_prompt": null
-  },
+  "generation_mode": "text_to_video",
+  "params_patch": {},
   "reply": "我为你准备了3个不同风格的小狗视频创意方向...",
   "needs_clarification": true,
   "ready_for_submit": false,
-  "confirm_submit": false
+  "confirm_submit": false,
+  "tool_call": {"tool_name": "none"}
 }
 </code></pre></p>
 
-<h3>第五步：CLI 打印回复并保存历史</h3>
+<h3>第六步：进入 <code>reflection_worker</code></h3>
+
+<p>反思节点检查：</p>
+
+<p><pre><code>{
+  "passed": true,
+  "should_block_tool": false,
+  "issues": []
+}
+</code></pre></p>
+
+<h3>第七步：<code>route_after_reflection</code></h3>
+
+<code>tool_call.tool_name == "none"</code>，走 <code>"end"</code> → <code>memory_writer</code>。
+
+<h3>第八步：<code>memory_writer</code></h3>
+
+<p>决定是否写入长期记忆，落盘，返回更新后的 <code>long_term_memory</code>。</p>
+
+<h3>第九步：CLI 打印回复并保存历史</h3>
 
 <p><pre><code>print(f"Agent: {state['reply']}")
-state["chat_history"].extend(
-    [
-        ChatTurn(role="user", content=user_input),
-        ChatTurn(role="assistant", content=state["reply"]),
-    ]
-)
+state["chat_history"].extend(...)
 </code></pre></p>
 
 <h2>6. 最终确认与接口调用</h2>
 
-<p>当用户输入：</p>
-
-<p><pre><code>确认生成
-</code></pre></p>
-
-<p>如果当前已经处于 <code>awaiting_confirmation=True</code>，并且 AI 返回：</p>
+<p>当用户输入"确认生成"时，<code>creative_worker</code> 返回：</p>
 
 <p><pre><code>{
-  "confirm_submit": true
+  "tool_call": {
+    "tool_name": "submit_text_to_video",
+    "reason": "用户明确确认提交"
+  }
 }
 </code></pre></p>
 
-<p>则：</p>
+<code>reflection_worker</code> 再检查一次。如果通过，<code>route_after_reflection()</code> 返回 <code>"tool"</code>，图进入 <code>tool_executor</code>：
 
-<p><pre><code>is_ready = True
+<p><pre><code># route_after_reflection 的判定逻辑
+if state["tool_call"].tool_name == "submit_text_to_video" and state["params"].prompt:
+    return "tool"
+if state["tool_call"].tool_name == "submit_image_to_video" and state["params"].prompt and state["params"].source_image_url:
+    return "tool"
+return "end"
 </code></pre></p>
 
-<p>循环结束：</p>
-
-<p><pre><code>while not state["is_ready"]:
-    ...
-</code></pre></p>
-
-<p>然后执行：</p>
-
-<p><pre><code>result = call_litmedia_text_video(state["params"], frontend_params)
-</code></pre></p>
-
-<p>这里的 <code>state["params"]</code> 是 Agent 生成的内容参数：</p>
-
-<p><pre><code>{
-  "prompt": "...",
-  "negative_prompt": "..."
-}
-</code></pre></p>
-
-<code>frontend_params</code> 是前端 UI 参数：
-
-<p><pre><code>{
-  "video_model": "54",
-  "video_num": 1,
-  "ratio": "16:9",
-  "quality": "360p",
-  "duration": 5
-}
-</code></pre></p>
-
-<p>两者合并成接口 payload。</p>
+<p>图生路径需要同时满足：<strong><code>tool_call.tool_name == submit_image_to_video</code></strong>、<strong><code>params.prompt</code> 非空</strong>、<strong><code>params.source_image_url</code> 非空</strong>。</p>
 
 <h2>7. Agent 参数与前端参数如何避免冲突</h2>
 
 <p>当前设计里：</p>
 
-<p><pre><code>Agent 负责 prompt / negative_prompt
-前端负责 ratio / duration / model / quality / video_num
+<p><pre><code>Agent 负责 prompt / negative_prompt / source_image_url
+前端负责 ratio / duration / model / quality / video_num / open_filter / sound_effect_switch / seed / is_feed
 </code></pre></p>
 
-<p>所以不会出现：</p>
-
-<p><pre><code>Agent 说 9:16
-前端选 16:9
-</code></pre></p>
-
-<p>这种冲突。</p>
-
-<p>如果未来希望用户在聊天里说：</p>
-
-<p><pre><code>我要竖屏，5 秒
-</code></pre></p>
-
-<p>建议不要让 Agent 直接覆盖前端参数，而是返回：</p>
-
-<p><pre><code>{
-  "ui_params_suggestion": {
-    "ratio": "9:16",
-    "duration": 5
-  }
-}
-</code></pre></p>
-
-<p>然后前端提示用户：</p>
-
-<p><pre><code>检测到你想改为竖屏 5 秒，是否应用到右侧参数？
-</code></pre></p>
-
-<p>最终仍以前端控件为准。</p>
+<p>所以不会出现 Agent 说 9:16 而前端选 16:9 的冲突。</p>
 
 <h2>8. 调试输出怎么看</h2>
 
-<p>当前脚本默认关闭调试输出：</p>
+<p>当前脚本默认开启调试输出：</p>
 
-<p><pre><code>DEBUG_AI_OUTPUT = os.getenv("DEBUG_AI_OUTPUT", "0") != "0"
-</code></pre></p>
-
-<p>含义是：</p>
-
-<ul>
-<li>如果没有设置环境变量，<code>os.getenv("DEBUG_AI_OUTPUT", "0")</code> 会得到 <code>"0"</code>，所以调试关闭。</li>
-<li>如果环境变量不是 <code>"0"</code>，调试开启。</li>
-</ul>
-
-<p>临时开启方式：</p>
-
-<p><pre><code>$env:DEBUG_AI_OUTPUT="1"
-python image_agent.py
+<p><pre><code>DEBUG_AI_OUTPUT = os.getenv("DEBUG_AI_OUTPUT", "1") != "0"
 </code></pre></p>
 
 <p>开启后终端会看到：</p>
 
-<p><pre><code>[DEBUG] intent_router AI 返回
+<p><pre><code>[DEBUG] memory_retriever 长期记忆
+[DEBUG] retrieval_router AI 判断
+[DEBUG] intent_router AI 返回
 [DEBUG] creative_worker AI 返回
+[DEBUG] reflection_worker AI 返回
+[DEBUG] structured_output_observation（结构化空返回时）
+[DEBUG] memory_writer 写入长期记忆
 [DEBUG] LitMedia payload
 </code></pre></p>
 
-<p>关闭方式：</p>
-
-<p><pre><code>$env:DEBUG_AI_OUTPUT="0"
-python image_agent.py
-</code></pre></p>
-
-<p>如果想看完整发给 AI 的上下文，可以继续扩展一个函数：</p>
-
-<p><pre><code>def debug_messages(title: str, messages: list) -&gt; None:
-    if not DEBUG_AI_OUTPUT:
-        return
-    print(f"\n[DEBUG] {title}")
-    for index, message in enumerate(messages, start=1):
-        print(f"\n--- message {index}: {message.type} ---")
-        print(message.content)
-</code></pre></p>
-
-<p>然后在 <code>router_llm.invoke(messages)</code> 或 <code>creative_llm.invoke(messages)</code> 前打印。</p>
-
 <h2>9. 当前代码里 AI 到底看到了什么上下文</h2>
 
-<p>你的一整个流程里，真正给 AI 看上下文的地方有三处。</p>
+<h3>9.1 <code>retrieval_router()</code> 给检索判断 AI 的上下文</h3>
 
-<h3>9.1 <code>intent_router()</code> 给路由 AI 的上下文</h3>
-
-<p>代码位置：</p>
-
-<p><pre><code>messages = [
-    SystemMessage(content=ROUTER_PROMPT),
-    HumanMessage(
-        content=(
-            "当前内容参数：\n"
-            f"{state['params'].model_dump_json(ensure_ascii=False, exclude_none=True)}\n\n"
-            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
-            "最近对话：\n"
-            f"{history_to_text(state['chat_history'], limit=8) or '暂无'}\n\n"
-            "用户最新输入：\n"
-            f"{state['user_input']}"
-        )
-    ),
-]
-</code></pre></p>
-
-<p>AI 看到的信息包括：</p>
+<p>包含：</p>
 
 <ul>
-<li><code>ROUTER_PROMPT</code>：路由规则。</li>
-<li>当前内容参数：已有的 <code>prompt / negative_prompt</code>。</li>
-<li>是否正在等待确认：<code>awaiting_confirmation</code>。</li>
-<li>最近 8 条对话：<code>history_to_text(..., limit=8)</code>。</li>
-<li>用户最新输入。</li>
+<li><code>RETRIEVAL_ROUTER_PROMPT</code></li>
+<li>当前内容参数</li>
+<li>长期记忆</li>
+<li>是否正在等待确认</li>
+<li>最近 6 条对话</li>
+<li>用户最新输入</li>
 </ul>
 
-<p>这个节点只负责判断：</p>
+<h3>9.2 <code>intent_router()</code> 给路由 AI 的上下文</h3>
 
-<p><pre><code>{
-  "route": "chat 或 creative",
-  "reason": "路由原因"
-}
-</code></pre></p>
-
-<h3>9.2 <code>chat_responder()</code> 给聊天 AI 的上下文</h3>
-
-<p>代码位置：</p>
-
-<p><pre><code>messages = [
-    SystemMessage(
-        content=(
-            f"{CHAT_PROMPT}\n\n"
-            "当前内容参数：\n"
-            f"{state['params'].model_dump_json(ensure_ascii=False, exclude_none=True)}"
-        )
-    )
-]
-for turn in state["chat_history"][-10:]:
-    if turn.role == "user":
-        messages.append(HumanMessage(content=turn.content))
-    else:
-        messages.append(AIMessage(content=turn.content))
-messages.append(HumanMessage(content=state["user_input"]))
-</code></pre></p>
-
-<p>AI 看到的信息包括：</p>
+<p>包含：</p>
 
 <ul>
-<li><code>CHAT_PROMPT</code>：告诉它自己是视频创作助手。</li>
-<li>当前内容参数。</li>
-<li>最近 10 条原始对话，且按 <code>HumanMessage / AIMessage</code> 类型传入。</li>
-<li>用户最新输入。</li>
+<li><code>ROUTER_PROMPT</code></li>
+<li>当前内容参数</li>
+<li>长期记忆</li>
+<li>RAG 上下文（如有）</li>
+<li>是否正在等待确认</li>
+<li>最近 8 条对话</li>
+<li>用户最新输入</li>
 </ul>
 
-<p>这个节点最接近普通聊天，所以适合回答：</p>
+<p>注意：走 Python 快捷路径时不调模型。</p>
 
-<p><pre><code>你能帮我干嘛？
-你记得我刚刚说了什么吗？
-我现在的 prompt 是什么？
-</code></pre></p>
+<h3>9.3 <code>chat_responder()</code> 给聊天 AI 的上下文</h3>
 
-<h3>9.3 <code>creative_worker()</code> 给创作 AI 的上下文</h3>
-
-<p>代码位置：</p>
-
-<p><pre><code>messages = [
-    SystemMessage(content=CREATIVE_PROMPT),
-    HumanMessage(
-        content=(
-            "当前内容参数：\n"
-            f"{current_params.model_dump_json(ensure_ascii=False, exclude_none=True)}\n\n"
-            "最近对话：\n"
-            f"{history_to_text(state['chat_history'], limit=10) or '暂无'}\n\n"
-            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
-            "用户最新输入：\n"
-            f"{state['user_input']}"
-        )
-    ),
-]
-</code></pre></p>
-
-<p>AI 看到的信息包括：</p>
+<p>包含：</p>
 
 <ul>
-<li><code>CREATIVE_PROMPT</code>：创作规则、产品边界、结构化输出要求。</li>
-<li>当前内容参数。</li>
-<li>最近 10 条对话文本。</li>
-<li>是否正在等待确认。</li>
-<li>用户最新输入。</li>
+<li><code>CHAT_PROMPT</code></li>
+<li>当前内容参数</li>
+<li>长期记忆</li>
+<li>RAG 上下文（如有）</li>
+<li>最近 10 条原始对话</li>
+<li>用户最新输入</li>
 </ul>
 
-<p>这个节点负责生成结构化结果：</p>
+<h3>9.4 <code>creative_worker()</code> 给创作 AI 的上下文</h3>
 
-<p><pre><code>{
-  "intent": "brainstorm/create_prompt/update_prompt/confirm",
-  "params_patch": {
-    "prompt": "...",
-    "negative_prompt": "..."
-  },
-  "merge_strategy": "fill_missing/overwrite",
-  "reply": "...",
-  "ready_for_submit": true,
-  "confirm_submit": false
-}
-</code></pre></p>
-
-<h2>10. <code>limit=8/10</code> 是什么</h2>
-
-<p>这不是模型限制，而是代码里人为决定“给 AI 看最近多少条对话”。</p>
-
-<p>例如：</p>
-
-<p><pre><code>history_to_text(state["chat_history"], limit=10)
-</code></pre></p>
-
-<p>内部实际做的是：</p>
-
-<p><pre><code>history[-10:]
-</code></pre></p>
-
-<p>也就是只取最近 10 条历史。</p>
-
-<p>为什么不全部给 AI？</p>
+<p>包含：</p>
 
 <ul>
-<li>上下文越长，token 消耗越高。</li>
-<li>模型响应更慢。</li>
-<li>很久以前的信息可能干扰当前任务。</li>
-<li>超过模型上下文窗口后会被截断或报错。</li>
+<li><code>CREATIVE_PROMPT</code></li>
+<li>当前内容参数</li>
+<li>长期记忆</li>
+<li>RAG 上下文（如有）</li>
+<li>最近 10 条对话文本</li>
+<li>是否正在等待确认</li>
+<li>用户最新输入</li>
 </ul>
 
-<p>企业版常见做法是：</p>
+<h3>9.5 <code>i2v_worker()</code> 给图生 AI 的上下文</h3>
 
-<p><pre><code>长期摘要 memory_summary + 最近 10-20 条原文
-</code></pre></p>
+<p>包含：</p>
 
-<p>当前脚本还没有 <code>memory_summary</code>，只有：</p>
+<ul>
+<li><code>I2V_PROMPT</code></li>
+<li>当前内容参数（含 <code>source_image_url</code>）</li>
+<li>最近对话</li>
+<li>是否正在等待确认</li>
+<li>用户最新输入</li>
+</ul>
 
-<p><pre><code>chat_history: list[ChatTurn]
-</code></pre></p>
+<h2>10. <code>limit=6/8/10</code> 是什么</h2>
 
-<p>所以现在 AI 主要依靠：</p>
+<p>这是代码里人为决定"给 AI 看最近多少条对话"。限制上下文长度是为了：</p>
 
-<p><pre><code>当前 params + 最近若干条 chat_history
+<ul>
+<li>降低 token 消耗。</li>
+<li>减少模型响应时间。</li>
+<li>避免旧信息干扰当前任务。</li>
+<li>防止超过模型上下文窗口。</li>
+</ul>
+
+<p>当前脚本有长期记忆补充：<code>memory_retriever</code> + <code>retrieval_router</code> + <code>rag_retriever</code>。</p>
+
+<p>所以 AI 依靠：</p>
+
+<p><pre><code>长期记忆 long_term_memory + RAG 上下文 rag_context + 最近若干条 chat_history
 </code></pre></p>
 
 <p>来理解上下文。</p>
 
-<h2>11. <code>RouteDecision</code> 那段动态模型是什么意思</h2>
+<h2>11. <code>RouteDecision</code> 的定义</h2>
 
-<p>当前代码里有这一段：</p>
+<p>当前代码里 <code>RouteDecision</code> 已经是显式类：</p>
 
-<p><pre><code>router_llm = llm.with_structured_output(
-    type(
-        "RouteDecision",
-        (BaseModel,),
-        {
-            "__annotations__": {
-                "route": Literal["chat", "creative"],
-                "reason": str,
-            },
-            "route": Field(description="chat 或 creative"),
-            "reason": Field(description="路由原因"),
-        },
+<p><pre><code>class RouteDecision(BaseModel):
+    route: Literal["chat", "creative", "i2v"] = Field(
+        description="用户意图：chat=闲聊, creative=文生视频, i2v=图生视频"
     )
-)
-</code></pre></p>
-
-<p>这段是在用 Python 的 <code>type()</code> 动态创建一个 Pydantic 类。</p>
-
-<p>它等价于手写：</p>
-
-<p><pre><code>class RouteDecision(BaseModel):
-    route: Literal["chat", "creative"] = Field(description="chat 或 creative")
-    reason: str = Field(description="路由原因")
-
-router_llm = llm.with_structured_output(RouteDecision)
-</code></pre></p>
-
-<p>作用是要求路由 AI 返回固定结构：</p>
-
-<p><pre><code>{
-  "route": "creative",
-  "reason": "用户表达了视频创作需求"
-}
-</code></pre></p>
-
-<p>从可读性上看，建议以后改成显式类：</p>
-
-<p><pre><code>class RouteDecision(BaseModel):
-    route: Literal["chat", "creative"] = Field(description="chat 或 creative")
     reason: str = Field(description="路由原因")
 </code></pre></p>
 
-<p>这样比动态 <code>type(...)</code> 更适合学习和维护。</p>
+<p>比旧版动态 <code>type(...)</code> 更易读、更易维护。</p>
 
 <h2>12. 如何给不同路由用不同模型</h2>
 
-<p>当前代码里所有节点都共用同一个基础模型：</p>
-
-<p><pre><code>llm = build_llm()
-router_llm = llm.with_structured_output(...)
-creative_llm = llm.with_structured_output(CreativeUnderstanding)
-</code></pre></p>
+<p>当前代码里所有节点都共用同一个基础模型。</p>
 
 <p>如果想不同节点用不同模型，可以把 <code>build_llm()</code> 改成支持传模型名：</p>
 
 <p><pre><code>def build_llm(model: str | None = None) -&gt; ChatOpenAI:
-    ark_api_key = os.getenv("ARK_API_KEY") or DEFAULT_ARK_API_KEY
-
     return ChatOpenAI(
         api_key=ark_api_key,
         base_url=os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/coding/v3"),
@@ -966,60 +800,41 @@ creative_llm = llm.with_structured_output(CreativeUnderstanding)
     )
 </code></pre></p>
 
-<p>然后分别创建：</p>
-
-<p><pre><code>router_base_llm = build_llm(os.getenv("ARK_ROUTER_MODEL", "ark-code-latest"))
-chat_llm = build_llm(os.getenv("ARK_CHAT_MODEL", "ark-code-latest"))
-creative_base_llm = build_llm(os.getenv("ARK_CREATIVE_MODEL", "ark-code-latest"))
-
-router_llm = router_base_llm.with_structured_output(RouteDecision)
-creative_llm = creative_base_llm.with_structured_output(CreativeUnderstanding)
-</code></pre></p>
-
 <p>对应关系可以是：</p>
 
 <p><pre><code>intent_router：快模型、便宜模型
 chat_responder：普通对话模型
-creative_worker：创作能力更强的模型
+creative_worker / i2v_worker：创作能力更强的模型
 </code></pre></p>
 
-<h2>13. 最终接口调用不在 LangGraph 里</h2>
+<h2>13. 最终接口调用在 LangGraph 工具节点里</h2>
 
-<p>当前设计里，LangGraph 只负责对话和内容确认。</p>
-
-<p>真正调用接口发生在 <code>run_cli()</code> 循环结束后：</p>
-
-<p><pre><code>while not state["is_ready"]:
-    ...
-
-result = call_litmedia_text_video(state["params"], frontend_params)
-</code></pre></p>
-
-<p>也就是说：</p>
-
-<p><pre><code>LangGraph：负责让用户确认 prompt / negative_prompt
-普通 Python：负责合并前端参数、签名、请求 LitMedia
-</code></pre></p>
-
-<p>这样做的好处是：</p>
+<code>tool_executor()</code> 内部按 <code>tool_call.tool_name</code> 调用对应工具：
 
 <ul>
-<li>LLM 不直接控制外部副作用。</li>
-<li>只有 <code>is_ready=True</code> 后才提交。</li>
-<li>接口调用逻辑和对话逻辑分离。</li>
+<li><code>submit_text_to_video</code>：文生视频</li>
+<li><code>submit_image_to_video</code>：图生视频</li>
 </ul>
 
-<p>如果未来你要做 Web 版，可以让前端点击“生成”按钮后再调用接口，而不是 CLI 自动调用。</p>
+<p>参数来源：</p>
+
+<p><pre><code>state["params"]：Agent 生成的 prompt / negative_prompt / source_image_url
+frontend_params：前端选择的模型、比例、时长、清晰度、数量等
+</code></pre></p>
+
+<p>两者合并成接口 payload。</p>
 
 <h2>14. 当前脚本的设计优点</h2>
 
 <h3>职责清晰</h3>
 
-<p>Agent 只负责内容创作，不负责 UI 参数。</p>
+<p>Agent 只负责内容创作（prompt / negative_prompt / source_image_url），不负责 UI 参数。</p>
 
 <h3>可调试</h3>
 
 <p>结构化输出会打印出来，方便观察 AI 是否理解正确。</p>
+
+<p>CLI 标准输出改成 UTF-8，避免 Windows 控制台编码问题。</p>
 
 <h3>可扩展</h3>
 
@@ -1035,149 +850,77 @@ result = call_litmedia_text_video(state["params"], frontend_params)
 
 <h3>状态可控</h3>
 
-<p>LangGraph 让每轮流程固定：</p>
+<p>LangGraph 让每轮流程固定，不会让一个节点同时承担所有逻辑。</p>
 
-<p><pre><code>先路由，再执行对应节点
-</code></pre></p>
+<h3>结构化输出有兜底</h3>
 
-<p>不会让一个节点同时承担所有逻辑。</p>
+<code>invoke_structured_with_recovery</code> + <code>ensure_creative_understanding</code> + <code>generate_clarification_reply</code> 三层治理，避免模型空返回导致整个图崩掉。
+
+<h3>图生路径有多层保护</h3>
+
+<code>i2v_worker</code> 压 tool → <code>reflection_worker</code> 硬拦截 → <code>route_after_reflection</code> 三重检查，确保缺图时不误提交。
 
 <h2>15. 你继续学习时该看哪里</h2>
 
-<p>建议按顺序看 <code>image_agent.py</code>：</p>
+<p>建议按 <code>video_agent</code> 包内模块顺序阅读：</p>
 
 <ul>
-<li>看 Pydantic 模型：理解输入输出协议。</li>
-<li>看 <code>build_llm()</code>：理解模型怎么接 Ark。</li>
-<li>看 <code>intent_router()</code>：理解怎么判断路由。</li>
-<li>看 <code>creative_worker()</code>：理解怎么让 AI 生成结构化结果。</li>
-<li>看 <code>build_graph()</code>：理解 LangGraph 怎么把节点连起来。</li>
-<li>看 <code>run_cli()</code>：理解每轮用户输入如何触发图执行。</li>
-<li>看 <code>call_litmedia_text_video()</code>：理解确认后如何调用真实接口。</li>
+<li><code>video_agent/models.py</code>：Pydantic 协议与 <code>CreativeState</code>。</li>
+<li><code>video_agent/settings.py</code>：常量与配置。</li>
+<li><code>video_agent/llm_factory.py</code>：<code>build_llm()</code> 与结构化 Runnable。</li>
+<li><code>video_agent/prompts.py</code>：各节点系统提示词。</li>
+<li><code>video_agent/graph/nodes.py</code>：各节点实现。</li>
+<li><code>video_agent/graph/builder.py</code>：<code>build_graph()</code> 如何把节点连成状态机。</li>
+<li><code>video_agent/graph/routing.py</code>：条件边路由函数。</li>
+<li><code>video_agent/graph/utils.py</code>：<code>history_to_text</code>、<code>format_final_params</code> 等工具函数。</li>
+<li><code>video_agent/litmedia_client.py</code>：工具与 LitMedia HTTP。</li>
+<li><code>video_agent/memory_store.py</code>：长期记忆 JSON 持久化。</li>
+<li><code>video_agent/rag_service.py</code>：本地 Markdown 关键词检索。</li>
+<li><code>video_agent/logging_utils.py</code>：DEBUG 日志工具。</li>
+<li><code>video_agent/cli.py</code>：<code>run_cli()</code> 多轮会话循环。</li>
 </ul>
 
-<p>掌握这几个点，就能理解这个 Agent 的完整运行过程。</p>
+<p>掌握这些，就能理解这个 Agent 的完整运行过程。</p>
 
 <h2>16. 状态流转专题：<code>state = app.invoke(state)</code> 到底做了什么</h2>
 
-<p>这一节专门整理你刚才问到的几个关键点：</p>
-
-<p><pre><code>state = app.invoke(state)
-</code></pre></p>
-
-<p>以及：</p>
-
-<p><pre><code>"route": decision.route
-</code></pre></p>
-
-<p>和：</p>
-
-<p><pre><code>route_by_intent(state)
-</code></pre></p>
-
 <h3>16.1 <code>state</code> 是什么</h3>
 
-<p>在当前脚本里，<code>state</code> 是 LangGraph 每轮执行时传来传去的状态字典。</p>
-
-<p>它的结构由 <code>CreativeState</code> 定义：</p>
-
-<p><pre><code>class CreativeState(TypedDict):
-    user_input: str
-    params: CreativeParams
-    chat_history: list[ChatTurn]
-    route: Literal["chat", "creative"]
-    reply: str
-    is_ready: bool
-    awaiting_confirmation: bool
-</code></pre></p>
-
-<p>初始化时在 <code>run_cli()</code> 里：</p>
-
-<p><pre><code>state: CreativeState = {
-    "user_input": "",
-    "params": CreativeParams(),
-    "chat_history": [],
-    "route": "chat",
-    "reply": "",
-    "is_ready": False,
-    "awaiting_confirmation": False,
-}
-</code></pre></p>
-
-<p>可以把它理解成 Agent 当前这一轮的“工作台”：</p>
-
-<p><pre><code>用户最新说了什么？
-当前 prompt 是什么？
-历史对话有哪些？
-本轮要走 chat 还是 creative？
-最终要回复用户什么？
-是否已经确认生成？
-</code></pre></p>
+<code>state</code> 是 LangGraph 每轮执行时传来传去的状态字典，结构由 <code>CreativeState</code> 定义。
 
 <h3>16.2 每轮用户输入后，先更新 <code>state</code></h3>
-
-<p>用户输入后，CLI 会先把最新输入写进状态：</p>
 
 <p><pre><code>state = {
     **state,
     "user_input": user_input,
     "reply": "",
+    "long_term_memory": "",
+    "should_retrieve": False,
+    "retrieval_query": "",
+    "rag_context": "",
+    "rag_sources": [],
+    "resolved_image_url": "",
     "is_ready": False,
+    "tool_call": ToolCallRequest(),
+    "reflection_passed": True,
+    "reflection_issues": [],
 }
 </code></pre></p>
 
-<p>这里的 <code>**state</code> 表示复制旧状态。</p>
+<p>注意：每轮开始会清空上一轮的中间状态（<code>rag_context</code>、<code>rag_sources</code>、<code>resolved_image_url</code> 等），避免沿用旧数据。但 <code>params</code>、<code>chat_history</code>、<code>awaiting_confirmation</code> 这些跨轮持久的状态不会清空。</p>
 
-<p>然后后面的字段会覆盖旧值：</p>
-
-<p><pre><code>"user_input": user_input
-</code></pre></p>
-
-<p>表示把用户这次新输入写入状态。</p>
-
-<h3>16.3 <code>app.invoke(state)</code> 是什么</h3>
-
-<code>app</code> 是由：
-
-<p><pre><code>app = build_graph()
-</code></pre></p>
-
-<p>创建出来的 LangGraph 可执行对象。</p>
-
-<p>所以：</p>
-
-<p><pre><code>state = app.invoke(state)
-</code></pre></p>
-
-<p>意思是：</p>
-
-<p><pre><code>把当前 state 交给 LangGraph 跑一遍状态机，
-然后把 LangGraph 返回的新 state 覆盖回原来的 state。
-</code></pre></p>
-
-<p>你的图结构是：</p>
-
-<p><pre><code>START
-  ↓
-intent_router
-  ↓
-根据 route 分支
-  ├─ chat_responder
-  └─ creative_worker
-  ↓
-END
-</code></pre></p>
-
-<p>因此 <code>app.invoke(state)</code> 实际会做：</p>
+<h3>16.3 <code>app.invoke(state)</code> 的执行过程</h3>
 
 <ul>
-<li>执行 <code>intent_router(state)</code>。</li>
-<li>拿到 <code>intent_router</code> 返回的新状态。</li>
-<li>调用 <code>route_by_intent(state)</code> 判断下一步。</li>
-<li>如果返回 <code>chat</code>，执行 <code>chat_responder(state)</code>。</li>
-<li>如果返回 <code>creative</code>，执行 <code>creative_worker(state)</code>。</li>
-<li>到 <code>END</code>。</li>
-<li>返回最终状态。</li>
+<li><code>memory_retriever</code>：读长期记忆。</li>
+<li><code>retrieval_router</code>：决定是否检索。</li>
+<li>可选 <code>rag_retriever</code>：执行检索。</li>
+<li><code>intent_router</code>：判断路由。</li>
+<li>根据路由进入业务节点（<code>chat_responder</code> / <code>creative_worker</code> / <code>asset_resolver → i2v_worker</code>）。</li>
+<li>创作路径进 <code>reflection_worker</code>。</li>
+<li>根据反思结果走 <code>tool_executor</code> 或直接到 <code>memory_writer</code>。</li>
+<li><code>memory_writer</code>：写入记忆。</li>
+<li><code>END</code>：返回最终状态。</li>
 </ul>
 
 <h3>16.4 <code>route</code> 是在哪里写入 state 的</h3>
@@ -1191,654 +934,100 @@ END
 }
 </code></pre></p>
 
-<p>其中：</p>
+<p>Python 快捷路径同理：</p>
 
-<p><pre><code>decision = router_llm.invoke(messages)
+<p><pre><code>if has_image_url and has_i2v_intent:
+    return {
+        **state,
+        "route": "i2v",
+        "reply": "",
+    }
 </code></pre></p>
 
-<p>是 AI 返回的路由判断。</p>
+<h3>16.5 条件边怎么用</h3>
 
-<p>例如 AI 返回：</p>
+<p>三个条件边都只读 <code>state</code> 字段：</p>
 
-<p><pre><code>{
-  "route": "creative",
-  "reason": "用户表达了视频创作需求"
-}
-</code></pre></p>
+<ul>
+<li><code>route_after_retrieval</code>：读 <code>should_retrieve</code> + <code>retrieval_query</code>。</li>
+<li><code>route_by_intent</code>：读 <code>state["route"]</code>。</li>
+<li><code>route_after_reflection</code>：读 <code>tool_call.tool_name</code> + <code>params.prompt</code> + <code>params.source_image_url</code>。</li>
+</ul>
 
-<p>那么：</p>
+<h3>16.6 为什么要写成 <code>state = app.invoke(state)</code></h3>
 
-<p><pre><code>"route": decision.route
-</code></pre></p>
+<p>LangGraph 不会自动修改外部变量，它返回一个新状态。不写 <code>state =</code> 就拿不到节点更新后的结果。</p>
 
-<p>就等价于：</p>
-
-<p><pre><code>"route": "creative"
-</code></pre></p>
-
-<p>所以这个 return 实际是在说：</p>
-
-<p><pre><code>return {
-    **state,
-    "route": "creative",
-    "reply": "",
-}
-</code></pre></p>
-
-<p>这就是把 AI 判断出来的路由写入 <code>state["route"]</code>。</p>
-
-<h3>16.5 <code>route_by_intent(state)</code> 是怎么用的</h3>
-
-<p>函数本身很简单：</p>
-
-<p><pre><code>def route_by_intent(state: CreativeState) -&gt; Literal["chat", "creative"]:
-    return state["route"]
-</code></pre></p>
-
-<p>它只做一件事：</p>
-
-<p><pre><code>读取 state["route"] 并返回。
-</code></pre></p>
-
-<p>真正使用它的是这段：</p>
-
-<p><pre><code>graph.add_conditional_edges(
-    "intent_router",
-    route_by_intent,
-    {
-        "chat": "chat_responder",
-        "creative": "creative_worker",
-    },
-)
-</code></pre></p>
-
-<p>含义是：</p>
-
-<p><pre><code>intent_router 执行完以后，
-LangGraph 调用 route_by_intent(state)，
-如果返回 chat，就去 chat_responder，
-如果返回 creative，就去 creative_worker。
-</code></pre></p>
-
-<h3>16.6 一个完整例子</h3>
-
-<p>假设用户输入：</p>
-
-<p><pre><code>我想做一个小狗视频
-</code></pre></p>
-
-<p>执行前状态可能是：</p>
-
-<p><pre><code>state = {
-    "user_input": "我想做一个小狗视频",
-    "params": CreativeParams(prompt=None, negative_prompt=None),
-    "chat_history": [],
-    "route": "chat",
-    "reply": "",
-    "is_ready": False,
-    "awaiting_confirmation": False,
-}
-</code></pre></p>
-
-<p>然后执行：</p>
-
-<p><pre><code>state = app.invoke(state)
-</code></pre></p>
-
-<p>第一步进入 <code>intent_router()</code>。</p>
-
-<p>AI 返回：</p>
-
-<p><pre><code>{
-  "route": "creative",
-  "reason": "用户表达了视频创作需求"
-}
-</code></pre></p>
-
-<code>intent_router()</code> 返回的新状态里：
-
-<p><pre><code>"route": "creative"
-</code></pre></p>
-
-<p>然后 LangGraph 调用：</p>
-
-<p><pre><code>route_by_intent(state)
-</code></pre></p>
-
-<p>返回：</p>
-
-<p><pre><code>"creative"
-</code></pre></p>
-
-<p>于是 LangGraph 进入：</p>
-
-<p><pre><code>creative_worker(state)
-</code></pre></p>
-
-<code>creative_worker</code> 可能返回：
-
-<p><pre><code>state = {
-    "user_input": "我想做一个小狗视频",
-    "params": CreativeParams(prompt=None, negative_prompt=None),
-    "chat_history": [],
-    "route": "creative",
-    "reply": "我给你准备了 3 个小狗视频方向...",
-    "is_ready": False,
-    "awaiting_confirmation": False,
-}
-</code></pre></p>
-
-<p>最后 <code>app.invoke(state)</code> 把这个最终状态返回给 CLI。</p>
-
-<p>CLI 再打印：</p>
-
-<p><pre><code>print(f"Agent: {state['reply']}")
-</code></pre></p>
-
-<h3>16.7 为什么要写成 <code>state = app.invoke(state)</code></h3>
-
-<p>因为 LangGraph 不会自动修改你外部变量里的旧 <code>state</code>。</p>
-
-<p>它会返回一个“新状态”。</p>
-
-<p>所以你必须写：</p>
-
-<p><pre><code>state = app.invoke(state)
-</code></pre></p>
-
-<p>而不是只写：</p>
-
-<p><pre><code>app.invoke(state)
-</code></pre></p>
-
-<p>如果只写 <code>app.invoke(state)</code>，图虽然执行了，但你没有保存返回的新状态，后续循环里就拿不到新的 <code>reply</code>、<code>params</code>、<code>awaiting_confirmation</code>。</p>
-
-<h3>16.8 这套模式的核心记法</h3>
-
-<p>可以记成：</p>
-
-<p><pre><code>节点函数负责改 state
-边负责决定下一个节点
-app.invoke(state) 负责运行整张图
-state = app.invoke(state) 负责保存运行后的结果
-</code></pre></p>
-
-<p>更短一点：</p>
+<p>核心记法：</p>
 
 <p><pre><code>state 进去，state 出来。
 </code></pre></p>
 
 <h2>17. 每轮对话流程节点总览</h2>
 
-<p>这一节用更直观的方式，把“一轮用户输入”从终端进入，到 AI 处理，再到回复用户的完整流程写清楚。</p>
-
-<h2>17.1 总流程图</h2>
-
-<p>当前脚本每一轮对话的流程是：</p>
+<h3>17.1 总流程图</h3>
 
 <p><pre><code>用户输入
   ↓
 run_cli() 读取 input()
   ↓
-把 user_input 写入 state
+把 user_input 写入 state（同时清空中间状态）
   ↓
 state = app.invoke(state)
   ↓
 LangGraph START
   ↓
+memory_retriever → retrieval_router → [rag_retriever | skip]
+  ↓
 intent_router
   ↓
-route_by_intent(state)
-  ↓
 根据 state["route"] 分支
-  ├─ chat      -&gt; chat_responder  -&gt; END
-  └─ creative  -&gt; creative_worker -&gt; END
+  ├─ chat      → chat_responder → memory_writer → END
+  ├─ creative  → creative_worker → reflection_worker → [tool_executor | memory_writer] → memory_writer → END
+  └─ i2v       → asset_resolver → i2v_worker → reflection_worker → [tool_executor | memory_writer] → memory_writer → END
   ↓
 app.invoke(state) 返回新 state
   ↓
 run_cli() 打印 state["reply"]
   ↓
 把 user / assistant 写入 chat_history
-  ↓
-如果 state["is_ready"] = True
-  ↓
-退出循环，调用 LitMedia 接口
 </code></pre></p>
 
-<p>最核心的一句话是：</p>
+<h3>17.2 每个节点做什么</h3>
 
-<p><pre><code>每轮对话 = 先路由，再执行对应业务节点，最后返回更新后的 state。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h3>17.3 记法</h3>
+
+<p><pre><code>输入 → 写 state（清中间态）→ 跑图 → 必要时工具节点提交 → 打印 reply → 保存历史
 </code></pre></p>
 
-<h2>17.2 每个节点做什么</h2>
-
-<p>| 阶段 | 代码位置 | 是否调用 AI | 主要作用 | 主要修改的 state 字段 |</p>
-<p>|---|---|---:|---|---|</p>
-<p>| CLI 读取输入 | <code>run_cli()</code> | 否 | 读取用户输入，写入 <code>state["user_input"]</code> | <code>user_input</code>, <code>reply</code>, <code>is_ready</code> |</p>
-<p>| 执行图 | <code>state = app.invoke(state)</code> | 间接调用 | 触发 LangGraph 按图执行 | 由节点决定 |</p>
-<p>| 路由节点 | <code>intent_router()</code> | 是 | 判断当前输入是聊天还是创作 | <code>route</code>, <code>reply</code> |</p>
-<p>| 分支函数 | <code>route_by_intent()</code> | 否 | 读取 <code>state["route"]</code>，决定下一节点 | 不修改 |</p>
-<p>| 聊天节点 | <code>chat_responder()</code> | 是 | 处理能力介绍、闲聊、上下文问答 | <code>reply</code>, <code>is_ready</code> |</p>
-<p>| 创作节点 | <code>creative_worker()</code> | 是 | 生成/修改 prompt，判断是否可提交 | <code>params</code>, <code>reply</code>, <code>is_ready</code>, <code>awaiting_confirmation</code> |</p>
-<p>| 结束节点 | <code>END</code> | 否 | 本轮图执行结束 | 不修改 |</p>
-<p>| 保存历史 | <code>run_cli()</code> | 否 | 把本轮 user/assistant 写入历史 | <code>chat_history</code> |</p>
-<p>| 调接口 | <code>call_litmedia_text_video()</code> | 否 | 用户确认后请求生成接口 | 不属于 LangGraph |</p>
-
-<h2>17.3 第 1 步：CLI 读取用户输入</h2>
-
-<p>代码在 <code>run_cli()</code> 里：</p>
-
-<p><pre><code>user_input = input("User: ").strip()
-</code></pre></p>
-
-<p>如果用户输入：</p>
-
-<p><pre><code>我想生成一个关于小狗的视频
-</code></pre></p>
-
-<p>那么：</p>
-
-<p><pre><code>user_input = "我想生成一个关于小狗的视频"
-</code></pre></p>
-
-<p>然后代码把它写入 <code>state</code>：</p>
-
-<p><pre><code>state = {
-    **state,
-    "user_input": user_input,
-    "reply": "",
-    "is_ready": False,
-}
-</code></pre></p>
-
-<p>这一步还没有调用 AI，只是更新状态。</p>
-
-<h2>17.4 第 2 步：调用 LangGraph</h2>
-
-<p>代码：</p>
-
-<p><pre><code>state = app.invoke(state)
-</code></pre></p>
-
-<p>意思是：</p>
-
-<p><pre><code>把当前 state 交给 LangGraph，让它按 build_graph() 定义的图跑一遍。
-</code></pre></p>
-
-<p>此时 LangGraph 会从 <code>START</code> 开始。</p>
-
-<h2>17.5 第 3 步：进入 <code>intent_router</code></h2>
-
-<p>图里定义了：</p>
-
-<p><pre><code>graph.add_edge(START, "intent_router")
-</code></pre></p>
-
-<p>所以第一站一定是：</p>
-
-<p><pre><code>intent_router(state)
-</code></pre></p>
-
-<p>这个节点会组装给 AI 的上下文：</p>
-
-<p><pre><code>messages = [
-    SystemMessage(content=ROUTER_PROMPT),
-    HumanMessage(
-        content=(
-            "当前内容参数：\n"
-            f"{state['params'].model_dump_json(...)}\n\n"
-            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
-            "最近对话：\n"
-            f"{history_to_text(state['chat_history'], limit=8) or '暂无'}\n\n"
-            "用户最新输入：\n"
-            f"{state['user_input']}"
-        )
-    ),
-]
-</code></pre></p>
-
-<p>然后调用路由 AI：</p>
-
-<p><pre><code>decision = router_llm.invoke(messages)
-</code></pre></p>
-
-<p>AI 返回类似：</p>
-
-<p><pre><code>{
-  "route": "creative",
-  "reason": "用户表达了视频创作需求"
-}
-</code></pre></p>
-
-<p>然后写回 state：</p>
-
-<p><pre><code>return {
-    **state,
-    "route": decision.route,
-    "reply": "",
-}
-</code></pre></p>
-
-<p>这里最重要的是：</p>
-
-<p><pre><code>"route": decision.route
-</code></pre></p>
-
-<p>它把 AI 返回的 <code>"creative"</code> 写入了：</p>
-
-<p><pre><code>state["route"]
-</code></pre></p>
-
-<h2>17.6 第 4 步：条件分支</h2>
-
-<p>图里定义了：</p>
-
-<p><pre><code>graph.add_conditional_edges(
-    "intent_router",
-    route_by_intent,
-    {
-        "chat": "chat_responder",
-        "creative": "creative_worker",
-    },
-)
-</code></pre></p>
-
-<p>这表示：</p>
-
-<p><pre><code>intent_router 执行完后，调用 route_by_intent(state)。
-</code></pre></p>
-
-<code>route_by_intent</code> 是：
-
-<p><pre><code>def route_by_intent(state: CreativeState) -&gt; Literal["chat", "creative"]:
-    return state["route"]
-</code></pre></p>
-
-<p>它不调用 AI，也不改状态，只读：</p>
-
-<p><pre><code>state["route"]
-</code></pre></p>
-
-<p>如果它返回：</p>
-
-<p><pre><code>"chat"
-</code></pre></p>
-
-<p>LangGraph 走：</p>
-
-<p><pre><code>chat_responder
-</code></pre></p>
-
-<p>如果它返回：</p>
-
-<p><pre><code>"creative"
-</code></pre></p>
-
-<p>LangGraph 走：</p>
-
-<p><pre><code>creative_worker
-</code></pre></p>
-
-<h2>17.7 第 5A 步：如果走 <code>chat_responder</code></h2>
-
-<p>适合这些输入：</p>
-
-<p><pre><code>你能帮我干嘛？
-你记得我刚刚说了什么吗？
-我现在的 prompt 是什么？
-</code></pre></p>
-
-<p>代码会构造聊天上下文：</p>
-
-<p><pre><code>messages = [
-    SystemMessage(
-        content=(
-            f"{CHAT_PROMPT}\n\n"
-            "当前内容参数：\n"
-            f"{state['params'].model_dump_json(...)}"
-        )
-    )
-]
-</code></pre></p>
-
-<p>然后把最近历史加入：</p>
-
-<p><pre><code>for turn in state["chat_history"][-10:]:
-    if turn.role == "user":
-        messages.append(HumanMessage(content=turn.content))
-    else:
-        messages.append(AIMessage(content=turn.content))
-</code></pre></p>
-
-<p>最后追加本轮输入：</p>
-
-<p><pre><code>messages.append(HumanMessage(content=state["user_input"]))
-</code></pre></p>
-
-<p>调用 AI：</p>
-
-<p><pre><code>response = llm.invoke(messages)
-</code></pre></p>
-
-<p>写回 state：</p>
-
-<p><pre><code>return {
-    **state,
-    "reply": str(response.content),
-    "is_ready": False,
-}
-</code></pre></p>
-
-<p>这个分支执行完后：</p>
-
-<p><pre><code>graph.add_edge("chat_responder", END)
-</code></pre></p>
-
-<p>本轮结束。</p>
-
-<h2>17.8 第 5B 步：如果走 <code>creative_worker</code></h2>
-
-<p>适合这些输入：</p>
-
-<p><pre><code>我想生成一个关于小狗的视频
-第二种
-改成更搞笑一点
-确认生成
-</code></pre></p>
-
-<p>代码会构造创作上下文：</p>
-
-<p><pre><code>messages = [
-    SystemMessage(content=CREATIVE_PROMPT),
-    HumanMessage(
-        content=(
-            "当前内容参数：\n"
-            f"{current_params.model_dump_json(...)}\n\n"
-            "最近对话：\n"
-            f"{history_to_text(state['chat_history'], limit=10) or '暂无'}\n\n"
-            f"是否正在等待最终确认：{state['awaiting_confirmation']}\n\n"
-            "用户最新输入：\n"
-            f"{state['user_input']}"
-        )
-    ),
-]
-</code></pre></p>
-
-<p>调用结构化 AI：</p>
-
-<p><pre><code>understanding = creative_llm.invoke(messages)
-</code></pre></p>
-
-<p>这里的 <code>creative_llm</code> 是：</p>
-
-<p><pre><code>creative_llm = llm.with_structured_output(CreativeUnderstanding)
-</code></pre></p>
-
-<p>所以 AI 必须返回 <code>CreativeUnderstanding</code> 结构。</p>
-
-<p>例如：</p>
-
-<p><pre><code>{
-  "intent": "create_prompt",
-  "params_patch": {
-    "prompt": "短腿柯基在阳光客厅里追彩色毛绒球...",
-    "negative_prompt": "画面昏暗、镜头剧烈晃动、场景杂乱"
-  },
-  "merge_strategy": "fill_missing",
-  "reply": "我已经帮你整理成完整视频提示词啦。",
-  "ready_for_submit": true,
-  "confirm_submit": false
-}
-</code></pre></p>
-
-<p>然后代码合并参数：</p>
-
-<p><pre><code>updated_params = current_params.model_copy(deep=True)
-patch = understanding.params_patch
-allow_overwrite = understanding.merge_strategy == "overwrite"
-
-if patch.prompt and (updated_params.prompt is None or allow_overwrite):
-    updated_params.prompt = patch.prompt.strip()
-</code></pre></p>
-
-<p>如果用户已经确认提交：</p>
-
-<p><pre><code>is_ready = bool(
-    state["awaiting_confirmation"]
-    and understanding.confirm_submit
-    and updated_params.prompt
-)
-</code></pre></p>
-
-<p>如果内容已经准备好，但还没最终确认：</p>
-
-<p><pre><code>awaiting_confirmation = bool(
-    understanding.ready_for_submit
-    and updated_params.prompt
-    and not is_ready
-)
-</code></pre></p>
-
-<p>最后写回 state：</p>
-
-<p><pre><code>return {
-    **state,
-    "params": updated_params,
-    "reply": understanding.reply,
-    "is_ready": is_ready,
-    "awaiting_confirmation": awaiting_confirmation,
-}
-</code></pre></p>
-
-<p>这个分支执行完后：</p>
-
-<p><pre><code>graph.add_edge("creative_worker", END)
-</code></pre></p>
-
-<p>本轮结束。</p>
-
-<h2>17.9 第 6 步：<code>app.invoke(state)</code> 返回最终状态</h2>
-
-<p>不管走 <code>chat_responder</code> 还是 <code>creative_worker</code>，最后都会到：</p>
-
-<p><pre><code>END
-</code></pre></p>
-
-<p>然后：</p>
-
-<p><pre><code>state = app.invoke(state)
-</code></pre></p>
-
-<p>右边的 <code>app.invoke(state)</code> 返回最终状态。</p>
-
-<p>左边的 <code>state =</code> 把新状态保存起来。</p>
-
-<p>如果不写左边的 <code>state =</code>，就拿不到节点更新后的结果。</p>
-
-<h2>17.10 第 7 步：CLI 打印回复</h2>
-
-<p>图执行完后，CLI 打印：</p>
-
-<p><pre><code>print(f"Agent: {state['reply']}")
-</code></pre></p>
-
-<p>这个 <code>reply</code> 来自：</p>
-
-<ul>
-<li><code>chat_responder()</code> 的 <code>response.content</code></li>
-<li>或 <code>creative_worker()</code> 的 <code>understanding.reply</code></li>
-</ul>
-
-<h2>17.11 第 8 步：保存对话历史</h2>
-
-<p>打印后，CLI 会保存本轮用户输入和助手回复：</p>
-
-<p><pre><code>state["chat_history"].extend(
-    [
-        ChatTurn(role="user", content=user_input),
-        ChatTurn(role="assistant", content=state["reply"]),
-    ]
-)
-</code></pre></p>
-
-<p>这一步非常重要。</p>
-
-<p>下一轮调用 AI 时，<code>intent_router</code>、<code>chat_responder</code>、<code>creative_worker</code> 都会从 <code>chat_history</code> 里取最近对话作为上下文。</p>
-
-<p>如果不保存历史，AI 就不知道上一轮发生了什么。</p>
-
-<h2>17.12 第 9 步：如果 <code>is_ready=True</code>，调用接口</h2>
-
-<p>循环条件是：</p>
-
-<p><pre><code>while not state["is_ready"]:
-</code></pre></p>
-
-<p>如果 <code>creative_worker()</code> 返回：</p>
-
-<p><pre><code>"is_ready": True
-</code></pre></p>
-
-<p>循环结束。</p>
-
-<p>然后执行：</p>
-
-<p><pre><code>result = call_litmedia_text_video(state["params"], frontend_params)
-</code></pre></p>
-
-<p>这里不再是 LangGraph 节点，而是普通 Python 业务逻辑。</p>
-
-<p>参数来源：</p>
-
-<p><pre><code>state["params"]：Agent 生成的 prompt / negative_prompt
-frontend_params：前端选择的模型、比例、时长、清晰度、数量
-</code></pre></p>
-
-<p>合并后请求 LitMedia。</p>
-
-<h2>17.13 每轮节点输入输出速查表</h2>
-
-<p>| 节点 | 输入 | 输出 | 是否调用 AI | 典型用途 |</p>
-<p>|---|---|---|---:|---|</p>
-<p>| <code>intent_router</code> | 当前 <code>state</code> | 写入 <code>state["route"]</code> | 是 | 判断 chat/creative |</p>
-<p>| <code>route_by_intent</code> | 当前 <code>state</code> | 返回 <code>"chat"</code> 或 <code>"creative"</code> | 否 | LangGraph 条件分支 |</p>
-<p>| <code>chat_responder</code> | 当前 <code>state</code> | 写入 <code>state["reply"]</code> | 是 | 闲聊、能力介绍、上下文问答 |</p>
-<p>| <code>creative_worker</code> | 当前 <code>state</code> | 写入 <code>params/reply/is_ready/awaiting_confirmation</code> | 是 | 创意构思、prompt 生成/修改、确认提交 |</p>
-<p>| <code>call_litmedia_text_video</code> | <code>CreativeParams + FrontendParams</code> | 接口响应 | 否 | 最终生成视频 |</p>
-
-<h2>17.14 你可以这样记</h2>
-
-<p><pre><code>run_cli 负责循环
-app.invoke 负责跑图
+<p>更详细：</p>
+
+<p><pre><code>memory_retriever 读记忆
+retrieval_router 决定检索
+rag_retriever 执行检索
 intent_router 负责分流
 chat_responder 负责聊天
-creative_worker 负责创作
-call_litmedia_text_video 负责提交接口
-</code></pre></p>
-
-<p>更短的记法：</p>
-
-<p><pre><code>输入 -&gt; 写 state -&gt; 跑图 -&gt; 更新 state -&gt; 打印 reply -&gt; 保存历史 -&gt; 必要时调接口
+creative_worker 负责文生创作
+asset_resolver 解析图片
+i2v_worker 负责图生创作
+reflection_worker 负责审查
+tool_executor 负责提交接口
+memory_writer 负责写记忆
 </code></pre></p>
 
         </div>
