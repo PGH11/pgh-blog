@@ -73,12 +73,6 @@
 <blockquote>
 <p>这篇文章记录一次自动化测试 Agent 的实践：用户在前端输入目标 URL 和自然语言测试目标，后端通过 LangGraph 做外层 ReAct 编排，再交给 browser-use 驱动真实浏览器完成测试，最后生成中文 Markdown 测试报告。</p>
 </blockquote>
-<p>本文配图：</p>
-<ul>
-<li>正文图 1：整体架构图</li>
-<li>正文图 2：LangGraph ReAct 状态机图</li>
-<li>正文图 3：一次登录测试成功后的 Markdown 报告截图，可以使用实际运行页面截图补充。</li>
-</ul>
 <h2>为什么想做这个 Agent</h2>
 <p>传统 Web 自动化测试通常依赖固定脚本。比如一个登录测试脚本可能长这样：</p>
 <pre><code class="language-python">await page.goto(&quot;https://example.com&quot;)
