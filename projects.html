@@ -55,19 +55,19 @@
                     <div class="project-icon" style="font-size: 64px; margin-bottom: 24px;">🧭</div>
                     <h3 class="project-title" style="font-size: 26px;">agent-browser</h3>
                     <p class="project-desc" style="font-size: 16px; margin-bottom: 24px;">
-                        一个基于 LangGraph 外层状态机和 browser-use 浏览器执行引擎的自然语言自动化测试 Agent。
-                        用户在前端输入目标 URL 和测试目标后，系统会自动规划测试步骤、驱动真实浏览器执行点击输入等待等操作，
-                        并输出中文 Markdown 测试报告。
+                        一个基于 LangGraph 外层状态机、AI 计划生成和 browser-use 浏览器执行引擎的自然语言自动化测试 Agent。
+                        用户在前端输入目标 URL 和测试目标后，系统会先校验请求、观察页面、生成测试计划与断言，再驱动真实浏览器执行，
+                        并以流式进度、历史记录和中文 Markdown 报告呈现结果。
                     </p>
                     <div style="margin-bottom: 24px;">
                         <h4 style="margin-bottom: 12px; color: var(--text-primary);">核心能力</h4>
                         <ul style="list-style: none; color: var(--text-secondary); font-size: 14px; line-height: 2;">
-                            <li>自然语言驱动浏览器自动化测试</li>
-                            <li>LangGraph 外层 ReAct 状态机编排</li>
+                            <li>AI 请求合理性校验，拒绝模糊或不可执行目标</li>
+                            <li>页面快照采集：标题、文本、可交互元素、候选链接和截图</li>
+                            <li>动态生成测试计划与外层断言</li>
                             <li>browser-use 执行真实浏览器操作</li>
-                            <li>支持有头模式观察执行过程</li>
-                            <li>输出结构化执行结果和 Markdown 报告</li>
-                            <li>兼容 OpenAI/Ark 模型配置</li>
+                            <li>流式展示 Agent 进度，支持历史报告回填</li>
+                            <li>按域名沉淀轻量测试记忆</li>
                         </ul>
                     </div>
                     <div class="project-tags" style="margin-bottom: 24px;">
@@ -75,6 +75,7 @@
                         <span class="tag">browser-use</span>
                         <span class="tag">FastAPI</span>
                         <span class="tag">Playwright</span>
+                        <span class="tag">Streaming</span>
                         <span class="tag">AI Agent</span>
                     </div>
                     <div style="display: flex; gap: 16px; flex-wrap: wrap;">

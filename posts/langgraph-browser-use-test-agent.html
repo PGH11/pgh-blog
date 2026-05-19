@@ -63,17 +63,18 @@
         <div class="post-container">
             <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
             <h1 class="post-title">LangGraph + browser-use：一个自然语言驱动的自动化测试 Agent 架构设计</h1>
-            <div class="post-meta"><span class="post-category">AI 测试</span><span class="post-date">2026年5月18日</span></div>
-            <p class="post-summary"></p>
+            <div class="post-meta"><span class="post-category">AI 测试</span><span class="post-date">2026年5月19日更新</span></div>
+            <p class="post-summary">这次迭代把原来的自然语言浏览器测试 Demo，推进成一个带 AI 请求校验、页面快照、动态断言、流式进度和历史记忆的可接入 Agent 服务。</p>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
             <p>--- title: &quot;LangGraph + browser-use：一个自然语言驱动的自动化测试 Agent 架构设计&quot; date: 2026-05-18 tags:</p>
 <ul><li>AI Agent</li><li>browser-use</li><li>LangGraph</li><li>自动化测试</li></ul>
-<p>summary: &quot;一个基于 LangGraph 外层状态机和 browser-use 浏览器执行引擎的自动化测试 Agent 设计，重点记录 Agent 框架、节点职责、路由逻辑、状态流转和工程化踩坑。&quot; ---</p>
+<p>summary: &quot;一个基于 LangGraph 外层状态机、页面快照、AI 断言、流式进度和 browser-use 浏览器执行引擎的自动化测试 Agent 设计，重点记录 Agent 框架、节点职责、路由逻辑、状态流转和工程化踩坑。&quot; ---</p>
 <h2>LangGraph + browser-use：一个自然语言驱动的自动化测试 Agent 架构设计</h2>
 <blockquote><p>这篇文章记录一次自动化测试 Agent 的实践：用户在前端输入目标 URL 和自然语言测试目标，后端通过 LangGraph 做外层 ReAct 编排，再交给 browser-use 驱动真实浏览器完成测试，最后生成中文 Markdown 测试报告。</p></blockquote>
+<blockquote><p>2026-05-19 更新：项目已经新增 AI 请求合理性校验、计划前页面快照、动态测试计划、外层断言、AI 复核、流式 NDJSON 进度、测试历史和按域名沉淀的轻量记忆。代码已同步到 <a href="https://github.com/PGH11/agent-browser" target="_blank">GitHub: PGH11/agent-browser</a>。</p></blockquote>
 <p>本文配图：</p>
 <ul><li>正文图 1：整体架构图</li><li>正文图 2：LangGraph ReAct 状态机图</li><li>正文图 3：一次登录测试成功后的 Markdown 报告截图，可以使用实际运行页面截图补充。</li></ul>
 <h3>为什么想做这个 Agent</h3>
@@ -660,14 +661,14 @@ pydantic
 python-dotenv
 playwright</code></pre>
 <h3>当前效果</h3>
-<p>目前这个初版已经做到：</p>
-<ul><li>前端输入自然语言测试目标</li><li>后端 API 接收任务</li><li>LangGraph 外层 ReAct 编排</li><li>browser-use 驱动真实浏览器</li><li>支持有头模式查看操作过程</li><li>支持视觉模型理解页面截图</li><li>输出中文 Markdown 测试报告</li><li>报告中包含测试计划、执行轨迹、最终结果和错误信息</li></ul>
-<p>它还不是一个完整测试平台，但已经有了可扩展的骨架。</p>
+<p>目前这个版本已经做到：</p>
+<ul><li>前端输入自然语言测试目标，并通过流式接口实时看到 Agent 节点进度</li><li>后端提供普通执行接口、流式执行接口和历史记录接口</li><li>LangGraph 外层 ReAct 编排已经扩展为请求校验、页面观察、计划生成、断言生成、浏览器执行和外层复核</li><li>页面快照节点会提取标题、当前 URL、可见文本、可交互元素、候选链接和截图路径</li><li>AI 根据用户目标、页面快照和历史记忆动态生成测试计划</li><li>AI 根据测试目标和页面结构生成外层断言，并在执行后复核 browser-use 最终报告</li><li>browser-use 驱动真实浏览器执行点击、输入、等待和跳转等操作</li><li>测试历史写入 <code>artifacts/test_history/history.jsonl</code>，并按域名沉淀轻量记忆到 <code>memory.json</code></li><li>输出中文 Markdown 报告，包含测试计划、断言、页面快照、执行轨迹、外层评估、错误信息和截图产物</li></ul>
+<p>它现在已经不只是一次性 Demo，而是具备了“前端可接入、过程可追踪、结果可复核”的服务雏形。</p>
 <h3>后续可以怎么扩展</h3>
 <p>后面可以继续做这些增强：</p>
-<div class="table-wrap"><table><thead><tr><th>方向</th><th>说明</th></tr></thead><tbody><tr><td>测试历史</td><td>保存每次执行的 URL、目标、报告、截图和耗时</td></tr><tr><td>报告管理</td><td>在前端提供历史报告列表和详情页</td></tr><tr><td>账号管理</td><td>把测试账号从自然语言中拆出来，改成安全凭证配置</td></tr><tr><td>失败重试</td><td>对网络抖动、元素加载慢、模型偶发格式错误做自动重试</td></tr><tr><td>截图归档</td><td>将 browser-use 截图统一复制到项目 artifacts 目录</td></tr><tr><td>断言增强</td><td>允许用户配置必须出现的文本、URL 变化或页面状态</td></tr><tr><td>巡检模式</td><td>针对导航栏、按钮、链接做批量跳转检查</td></tr><tr><td>多浏览器</td><td>支持 Chromium、Chrome、Edge 等不同浏览器配置</td></tr><tr><td>多环境</td><td>支持测试环境、预发环境、生产环境 URL 切换</td></tr></tbody></table></div>
-<p>我觉得最值得优先做的是“测试历史”和“失败重试”。</p>
-<p>测试历史能让这个工具从一次性 Demo 变成可追踪系统；失败重试则能显著提升 AI 自动化测试的稳定性。</p>
+<div class="table-wrap"><table><thead><tr><th>方向</th><th>说明</th></tr></thead><tbody><tr><td>报告管理</td><td>把当前历史列表升级成独立报告详情页，支持筛选、搜索和失败原因归类</td></tr><tr><td>账号管理</td><td>把测试账号从自然语言中拆出来，改成安全凭证配置，避免历史记录里出现敏感信息</td></tr><tr><td>失败重试</td><td>对网络抖动、元素加载慢、模型偶发格式错误做自动重试</td></tr><tr><td>截图归档</td><td>将页面快照和 browser-use 截图统一归档并在报告中直接预览</td></tr><tr><td>断言配置</td><td>允许用户补充必须出现的文本、URL 变化、按钮状态或业务结果</td></tr><tr><td>巡检模式</td><td>针对导航栏、按钮、链接做批量跳转检查，并控制最大覆盖数量</td></tr><tr><td>多浏览器</td><td>支持 Chromium、Chrome、Edge 等不同浏览器配置</td></tr><tr><td>多环境</td><td>支持测试环境、预发环境、生产环境 URL 切换</td></tr><tr><td>CI 接入</td><td>把自然语言测试任务包装成可在流水线中触发的 smoke test</td></tr></tbody></table></div>
+<p>我觉得下一步最值得优先做的是“报告详情页”和“失败重试”。</p>
+<p>报告详情页能让历史记录真正变成可复盘资产；失败重试则能显著提升 AI 自动化测试在真实网页上的稳定性。</p>
 <h3>总结</h3>
 <p>这次实践最大的感受是：AI 自动化测试的难点不只是“让浏览器动起来”，而是让系统在复杂页面里持续完成这几件事：</p>
 <pre><code class="language-text">理解目标
