@@ -41,14 +41,8 @@
         <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line></svg>
         <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </div>
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="https://pgh11.github.io/pgh-blog/index.html" class="logo">PGH<span class="dot">.</span></a>
-            <ul class="nav-links"></ul>
-            <div class="hamburger"><span></span><span></span><span></span></div>
-        </div>
-    </nav>
-    <section class="post-header">
+    <div id="navbar-placeholder"></div>
+<section class="post-header">
         <div class="post-container">
             <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
             <h1 class="post-title">Fiddler + MuMu 模拟器抓取 Android 应用接口实战</h1>
@@ -339,15 +333,9 @@ Android App
             <p>但也要注意，抓包应只用于授权测试、内部排查和自有应用分析。涉及用户隐私、账号凭证、生产敏感数据时，需要严格遵守权限边界和数据安全要求。</p>
         </div>
     </article>
-    <footer class="footer">
-        <div class="footer-container">
-            <div class="footer-content">
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
-                <div class="footer-links"><div class="footer-column"><h4>导航</h4></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
-            </div>
-            <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>
-        </div>
-    </footer>
-    <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
+    <div id="footer-placeholder"></div>
+    <script src="../components/load-components.js"></script>
+
+<script src="https://pgh11.github.io/pgh-blog/script.js"></script>
 </body>
 </html>

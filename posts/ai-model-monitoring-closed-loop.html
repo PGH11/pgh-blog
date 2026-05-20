@@ -77,22 +77,8 @@
         <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
 
     </div>
-
-    <nav class="navbar">
-
-        <div class="nav-container">
-
-            <a href="https://pgh11.github.io/pgh-blog/index.html" class="logo">PGH<span class="dot">.</span></a>
-
-            <ul class="nav-links"></ul>
-
-            <div class="hamburger"><span></span><span></span><span></span></div>
-
-        </div>
-
-    </nav>
-
-    <section class="post-header">
+    <div id="navbar-placeholder"></div>
+<section class="post-header">
 
         <div class="post-container">
 
@@ -112,15 +98,9 @@
 
             <p>AI 生成类任务的失败排查，最麻烦的地方往往不是“发现失败”，而是失败之后还要继续回答：失败样本是谁、日志在哪里、错误发生在哪一段链路、应该找哪个模块处理。</p>
 
-
-
             <p>过去遇到模型生成失败，值班同学通常要经历一串手工动作：先看监控确认失败率，再去任务平台找样本，复制 <code>video_id</code>，打开阿里云 SLS 拼查询条件，筛错误日志，最后再凭经验判断是素材问题、参数问题、模型服务异常还是队列超时。</p>
 
-
-
             <p>这篇文章分享的不是“如何发一条失败告警”，而是如何把 <strong>发现异常、定位样本、查询日志、根因分析</strong> 串成一个低成本闭环：Python 负责实时发现模型失败，告警带出关键 <code>video_id</code>，OpenClaw 接住上下文并调用 <code>aliyun-sls-query</code> 查询 SLS 日志，最终输出可操作的初步诊断。</p>
-
-
 
             <div class="highlight-quote">
 
@@ -128,19 +108,11 @@
 
             </div>
 
-
-
             <h2>一、痛点：失败告警只是开始，不是结束</h2>
-
-
 
             <p>模型生成类任务有一个典型问题：失败不是单点故障，可能来自输入素材、模型参数、任务队列、模型服务、三方依赖、网关超时，也可能来自刚刚上线的代码变更。只看到“失败率升高”并不能直接指导处理动作。</p>
 
-
-
             <p>值班同学真正需要回答的是：</p>
-
-
 
             <ul>
 
@@ -156,19 +128,11 @@
 
             </ul>
 
-
-
             <p>所以这套系统的目标不是“多发一条告警”，而是把告警变成下一步排查动作的入口。</p>
-
-
 
             <h2>二、整体架构：5 层闭环设计</h2>
 
-
-
             <p>这套闭环可以拆成 5 层。前 4 层负责稳定发现问题，第 5 层负责把失败样本交给 OpenClaw 继续查日志、做判断。</p>
-
-
 
             <div class="architecture-box">
 
@@ -185,8 +149,6 @@
   → OpenClaw 解析日志并输出排查结论
 
             </div>
-
-
 
             <h3>2.1 数据采集层</h3>
 
@@ -206,8 +168,6 @@
 
             </ul>
 
-
-
             <p><strong>设计重点：</strong></p>
 
             <ul>
@@ -222,15 +182,9 @@
 
             </ul>
 
-
-
             <h3>2.2 异常识别层</h3>
 
-
-
             <p>监控逻辑没有直接看总失败率，而是优先关注“最新一段是否持续失败”。对于生成类任务来说，偶发失败并不少见，真正值得打扰的是某个模型在最近任务里持续失败。</p>
-
-
 
             <p>目前核心判断有两类：</p>
 
@@ -242,19 +196,13 @@
 
             </ol>
 
-
-
             <blockquote>
 
                 为什么这么设计？模型服务偶发失败很常见，单条失败不一定值得打扰；但“最新连续失败”更像正在发生的问题，优先级更高。
 
             </blockquote>
 
-
-
             <p>连续失败扫描的核心思路是：按 <code>create_at</code> 倒序，从最新任务向前看。遇到失败就累计，遇到生成中先跳过，遇到成功立即停止。这样回答的是值班同学最关心的问题：这个模型现在是不是还在失败？</p>
-
-
 
             <pre><code class="language-python">def detect_continuous_failure(tasks, threshold=10):
 
@@ -263,8 +211,6 @@
     consecutive_failures = 0
 
     failure_window = []
-
-
 
     for task in sorted(tasks, key=lambda item: item.create_at, reverse=True):
 
@@ -281,8 +227,6 @@
         else:
 
             break
-
-
 
     if consecutive_failures >= threshold:
 
@@ -302,19 +246,11 @@
 
         }
 
-
-
     return None</code></pre>
-
-
 
             <h3>2.3 告警通知层</h3>
 
-
-
             <p>告警通过钉钉机器人发送，但内容不能只写“失败了”。一个好的告警应该直接给出排查入口，尤其是后续交给 OpenClaw 查询日志所需的上下文。</p>
-
-
 
             <p><strong>推荐告警结构：</strong></p>
 
@@ -325,8 +261,6 @@
 统计范围：最近 N 条任务
 
 需关注模型：X 个
-
-
 
 1. 模型名称（type=xx）
 
@@ -342,19 +276,11 @@
 
             </div>
 
-
-
             <p>这里的 <code>video_id</code> 是整个闭环里最关键的信息。它既能让业务同学定位失败样本，也能让 OpenClaw 后续查询 SLS 时有明确关键词。告警内容应该服务于下一步日志分析，而不是停留在通知本身。</p>
-
-
 
             <h3>2.4 调度运行层</h3>
 
-
-
             <p>使用单进程循环调度器常驻运行，负责按固定周期触发失败监控任务。当前阶段保持简单就够了：失败监控默认每 10 分钟执行一次，日报任务每天固定时间执行，每个任务用 <code>safe_run</code> 包裹，避免单次异常导致进程退出。</p>
-
-
 
             <blockquote>
 
@@ -362,15 +288,9 @@
 
             </blockquote>
 
-
-
             <h3>2.5 OpenClaw 日志分析层</h3>
 
-
-
             <p>这是整篇文章最应该强调的一层。当实时监控发现模型失败后，系统已经给出了异常模型、失败区间和关键 <code>video_id</code>。接下来不应该让值班同学手工打开 SLS、拼查询条件、筛错误日志，而是把这些上下文交给 OpenClaw，通过 <code>aliyun-sls-query</code> 进入日志分析流程。</p>
-
-
 
             <p><strong>日志分析五步走：</strong></p>
 
@@ -388,13 +308,9 @@
 
             </ol>
 
-
-
             <p><strong>OpenClaw 提示词示例：</strong></p>
 
             <pre><code class="language-text">请使用 aliyun-sls-query 查询以下模型失败日志，并输出根因分析：
-
-
 
 - video_id: xxx
 
@@ -405,8 +321,6 @@
 - 查询时间范围: 失败区间前后各 30 分钟
 
 - 关注字段: error、exception、timeout、failed、模型服务返回码、请求耗时
-
-
 
 请输出：
 
@@ -420,15 +334,11 @@
 
 5. 是否需要扩大查询范围</code></pre>
 
-
-
             <p><strong>典型输出模板：</strong></p>
 
             <div class="architecture-box">
 
 初步判断：失败集中在模型服务调用阶段，日志中多次出现 timeout。
-
-
 
 关键日志摘要：
 
@@ -438,8 +348,6 @@
 
 - 同一时间段内多个 type 均出现类似问题
 
-
-
 建议动作：
 
 先确认模型服务可用性和队列积压情况，
@@ -448,19 +356,11 @@
 
             </div>
 
-
-
             <p>这一步的价值在于把“告警”升级成“可操作的初步诊断”。值班同学看到的不再只是失败数量，而是 OpenClaw 基于 SLS 日志整理出的关键错误、影响链路和建议动作。</p>
-
-
 
             <h2>三、关键设计思路</h2>
 
-
-
             <h3>3.1 用 <code>video_id</code> 串联业务状态和系统日志</h3>
-
-
 
             <p>整个方案的关键不是监控脚本本身，而是找到一个稳定的关联键。这里选择 <code>video_id</code>，因为它同时出现在：</p>
 
@@ -476,27 +376,15 @@
 
             </ul>
 
-
-
             <p>只要告警里带上 <code>video_id</code>，后续所有排查动作都可以围绕它展开。它就像一张快递单号，可以把“任务状态”和“系统日志”这两个原本分散的系统串起来。</p>
-
-
 
             <h3>3.2 先判断“是否正在失败”，再判断“失败了多少”</h3>
 
-
-
             <p>很多监控会直接看失败率，但生成任务的失败率容易受样本量和历史数据影响。低流量模型样本少，失败率会剧烈波动；高流量模型历史任务多，又可能稀释当前正在发生的问题。</p>
-
-
 
             <p>因此当前策略更关注最新任务序列。它不是问“过去一段时间失败率是多少”，而是问“这个模型现在是不是还在连续失败”。这个问题更接近值班场景，也更适合实时告警。</p>
 
-
-
             <h3>3.3 告警只发“需要行动”的信息</h3>
-
-
 
             <p>内部告警最怕两种情况：</p>
 
@@ -508,11 +396,7 @@
 
             </ul>
 
-
-
             <p>因此告警只保留四类信息：结论、依据、范围和入口。</p>
-
-
 
             <blockquote>
 
@@ -520,15 +404,9 @@
 
             </blockquote>
 
-
-
             <h3>3.4 OpenClaw 是闭环后半段的关键执行者</h3>
 
-
-
             <p><code>aliyun-sls-query</code> 解决的是“查得到日志”，OpenClaw 的价值是“读得懂日志，并把日志变成排查结论”。所以文章里要明确强调：实时监控负责发现异常，OpenClaw 负责接住异常并完成日志根因分析。</p>
-
-
 
             <div class="architecture-box">
 
@@ -536,19 +414,13 @@
 
 告警出现 → 人工找 video_id → 手工查 SLS → 人工筛日志 → 经验判断原因
 
-
-
 现在：
 
 告警出现 → 自动带出 video_id → OpenClaw 查询 SLS → 输出初步根因和建议动作
 
             </div>
 
-
-
             <h2>四、风险与注意事项</h2>
-
-
 
             <ul>
 
@@ -564,11 +436,7 @@
 
             </ul>
 
-
-
             <h2>总结</h2>
-
-
 
             <div class="highlight-quote">
 
@@ -576,38 +444,17 @@
 
             </div>
 
-
-
             <p>AI 时代的测试工程师，不应该只是发现问题的人，更应该是建设问题定位自动化能力的人。通过这套监控与 OpenClaw 日志分析闭环，原本需要几小时的人工排查过程，可以被压缩到几分钟内完成。</p>
-
-
 
             <p>更重要的是，它改变了团队处理模型失败的方式：过去排查失败像是在日志海里捞针；现在告警直接把 <code>video_id</code> 交给 OpenClaw，让它带着明确线索去 SLS 里找证据。</p>
 
         </div>
 
     </article>
+    <div id="footer-placeholder"></div>
+    <script src="../components/load-components.js"></script>
 
-    <footer class="footer">
-
-        <div class="footer-container">
-
-            <div class="footer-content">
-
-                <div class="footer-brand"><span class="logo">PGH<span class="dot">.</span></span><p class="footer-tagline">用代码保障质量，用测试守护体验</p></div>
-
-                <div class="footer-links"><div class="footer-column"><h4>导航</h4></div><div class="footer-column"><h4>社交</h4><a href="https://github.com/PGH11" target="_blank">GitHub</a></div></div>
-
-            </div>
-
-            <div class="footer-bottom"><p>© 2024 PGH. All rights reserved. Built with ❤️</p></div>
-
-        </div>
-
-    </footer>
-
-    <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
-
+<script src="https://pgh11.github.io/pgh-blog/script.js"></script>
 </body>
 
 </html>

@@ -48,18 +48,8 @@
         <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
         <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </div>
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="https://pgh11.github.io/pgh-blog/index.html" class="logo">PGH<span class="dot">.</span></a>
-            <ul class="nav-links">
-                <li><a href="https://pgh11.github.io/pgh-blog/index.html">首页</a></li>
-                <li><a href="https://pgh11.github.io/pgh-blog/blog.html" class="active">博客</a></li>
-                <li><a href="https://pgh11.github.io/pgh-blog/projects.html">项目</a></li>
-            </ul>
-            <div class="hamburger"><span></span><span></span><span></span></div>
-        </div>
-    </nav>
-    <section class="post-header">
+    <div id="navbar-placeholder"></div>
+<section class="post-header">
         <div class="post-container">
             <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
             <h1 class="post-title">LangGraph + browser-use：一个自然语言驱动的自动化测试 Agent 架构设计</h1>
@@ -1113,17 +1103,13 @@ Markdown 报告负责结果表达
 <p>这个初版已经可以完成真实页面的登录测试，也能把执行过程整理成中文报告。它离完整测试平台还有距离，但已经证明了一件事：自然语言驱动的浏览器自动化测试，是可以落到一个可运行工程里的。</p>
         </div>
     </article>
-    <footer class="footer">
-        <div class="footer-container">
-            <div class="footer-bottom">
-                <p>&copy; 2024 PGH. All rights reserved. Built with &#10084;&#65039;</p>
-            </div>
-        </div>
-    </footer>
-    <script type="module">
+    <div id="footer-placeholder"></div>
+<script type="module">
         import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
         mermaid.initialize({ startOnLoad: true, theme: "default", securityLevel: "loose" });
     </script>
+    <script src="../components/load-components.js"></script>
+
     <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
 </body>
 </html>

@@ -84,12 +84,14 @@ function loadComponents() {
 
 // 设置导航栏 active 状态
 function setActiveNav() {
-    const currentPage = window.location.pathname.split('/').pop();
+    const path = window.location.pathname;
+    const currentPage = path.split('/').pop();
     const navLinks = document.querySelectorAll('.nav-links a');
+    const activePage = path.includes('/posts/') || path.includes('\\posts\\') ? 'blog.html' : currentPage;
     
     navLinks.forEach(link => {
         const linkPage = link.getAttribute('href').split('/').pop();
-        if (linkPage === currentPage) {
+        if (linkPage === activePage) {
             link.classList.add('active');
         }
     });
