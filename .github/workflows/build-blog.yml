@@ -1,0 +1,44 @@
+name: Build Markdown Blog
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "posts-md/**"
+      - "scripts/build_posts.py"
+      - ".github/workflows/build-blog.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: python -m pip install markdown PyYAML
+
+      - name: Build HTML from Markdown
+        run: python scripts/build_posts.py
+
+      - name: Commit generated HTML
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add blog.html index.html posts/*.html
+            git commit -m "Build blog HTML from Markdown"
+            git push
+          fi
