@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermes Session Recorder 插件实践：用生命周期 Hook 还原 Agent 调用链 | PGH Blog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://pgh11.github.io/pgh-blog/styles.css">
+    <style>
+        .post-header { padding: 160px 24px 60px; background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), var(--bg-primary); }
+        .post-container { max-width: 880px; margin: 0 auto; }
+        .post-title { font-size: 42px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; }
+        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .post-category { padding: 6px 16px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .post-date { color: var(--text-tertiary); font-size: 15px; }
+        .post-summary { color: var(--text-secondary); font-size: 18px; line-height: 1.8; max-width: 780px; }
+        .post-content { padding: 40px 24px 80px; }
+        .post-content h1 { font-size: 34px; font-weight: 700; margin: 24px 0 24px; color: var(--text-primary); }
+        .post-content h2 { font-size: 28px; font-weight: 600; margin: 42px 0 20px; color: var(--text-primary); }
+        .post-content h3 { font-size: 22px; font-weight: 600; margin: 34px 0 16px; color: var(--text-primary); }
+        .post-content h4 { font-size: 18px; font-weight: 600; margin: 28px 0 14px; color: var(--text-primary); }
+        .post-content p { color: var(--text-secondary); line-height: 1.85; margin-bottom: 20px; font-size: 17px; }
+        .post-content ul, .post-content ol { color: var(--text-secondary); line-height: 1.8; margin-bottom: 22px; padding-left: 24px; }
+        .post-content li { margin-bottom: 10px; font-size: 17px; }
+        .post-content a { color: #3b82f6; text-decoration: none; }
+        .post-content a:hover { text-decoration: underline; }
+        .post-content code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #3b82f6; }
+        .post-content pre { background: var(--bg-secondary); padding: 20px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; border: 1px solid var(--border-color); }
+        .post-content pre code { background: none; padding: 0; color: var(--text-primary); font-size: 14px; line-height: 1.8; }
+        .post-content .mermaid { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin: 28px 0; overflow-x: auto; text-align: center; }
+        .post-content .mermaid svg { max-width: 100%; height: auto; }
+        .post-content blockquote { border-left: 4px solid #3b82f6; padding-left: 20px; margin: 24px 0; color: var(--text-tertiary); font-style: italic; }
+        .post-content figure { margin: 32px 0; }
+        .post-content img { width: 100%; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-secondary); }
+        .table-wrap { overflow-x: auto; margin: 28px 0; border: 1px solid var(--border-color); border-radius: 12px; }
+        .post-content table { width: 100%; border-collapse: collapse; min-width: 640px; }
+        .post-content th, .post-content td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary); vertical-align: top; }
+        .post-content th { color: var(--text-primary); background: var(--bg-secondary); font-weight: 600; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #3b82f6; text-decoration: none; font-weight: 500; margin-bottom: 32px; transition: transform 0.3s ease; }
+        .back-btn:hover { transform: translateX(-4px); }
+        @media (max-width: 768px) { .post-title { font-size: 32px; } .post-container { max-width: 100%; } }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" id="themeToggle">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+    </div>
+    <div id="navbar-placeholder"></div>
+    <section class="post-header">
+        <div class="post-container">
+            <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
+            <h1 class="post-title">Hermes Session Recorder 插件实践：用生命周期 Hook 还原 Agent 调用链</h1>
+            <div class="post-meta"><span class="post-category">AI Agent</span><span class="post-date">2026年5月29日</span></div>
+            <p class="post-summary">记录 session-recorder 插件如何通过 Hermes 生命周期 Hook 捕获 Agent 内部事件，并用 JSONL 还原一次请求的调用链路。</p>
+        </div>
+    </section>
+    <article class="post-content">
+        <div class="post-container">
+            <h1>Hermes Session Recorder 插件实践：用生命周期 Hook 还原 Agent 调用链</h1>
+<p>调试 AI Agent 工作流时，最难的往往不是接口有没有返回，而是一次用户请求在 Agent 内部到底经历了什么。</p>
+<p>在一个典型的 Hermes 集成里，一条请求可能经过前端、业务 API 服务、Hermes 容器、Hermes Agent、技能系统、工具调用、模型供应商 API。外层 HTTP 日志只能证明“请求进来了”，但很难回答“Agent 内部触发了几次模型调用”“最终是哪一轮输出”“技能链路有没有走到预期节点”。</p>
+<p><code>session-recorder</code> 插件就是为了解决这个问题。它不侵入 Hermes 主流程，而是挂在 Hermes 插件生命周期 Hook 上，把关键节点写成 JSONL 日志。这样我们可以按 session 回放 Agent 内部发生过的事件。</p>
+<p>本文重点讲两个部分：</p>
+<ol>
+<li>插件基于哪些生命周期 Hook 工作。</li>
+<li>每个 Hook 会注入哪些日志事件。</li>
+</ol>
+<h2>一、插件解决的问题</h2>
+<p>一次 Hermes 请求大致会经过这条链路：</p>
+<pre><code class="language-text">前端 / API Client
+  -&gt; 业务 API 服务
+  -&gt; Hermes 容器
+  -&gt; Hermes Agent
+  -&gt; skill / tool
+  -&gt; LLM Provider API
+</code></pre>
+<p>没有插件时，我们只能看到外层服务日志，例如请求 URL、响应状态码、接口返回体。可一旦问题出在 Hermes Agent 内部，就会很难定位：</p>
+<ul>
+<li>当前请求到底进入了哪个 Hermes 容器？</li>
+<li>插件有没有在新容器里启用？</li>
+<li>外层传入的 <code>session_id</code> 和 Hermes 内部日志文件名是不是同一个？</li>
+<li>一条用户消息为什么触发了多次模型调用？</li>
+<li>哪些事件是用户回合，哪些事件是 Hermes 内部模型请求？</li>
+<li>当前调用走的是哪个 <code>provider</code>、<code>base_url</code>、<code>api_mode</code>？</li>
+<li>当前日志为什么有 <code>api_request input=""</code>？</li>
+</ul>
+<p><code>session-recorder</code> 的定位是：记录 Hermes Agent 内部真实触发的生命周期事件，而不是替代业务服务日志。</p>
+<h2>二、日志保存位置</h2>
+<p>插件默认把日志写在插件目录下：</p>
+<pre><code class="language-text">&lt;plugin_dir&gt;/session-records/&lt;session_id&gt;.jsonl
+</code></pre>
+<p>在 Docker 容器里，常见路径是：</p>
+<pre><code class="language-text">/opt/data/plugins/session-recorder/session-records/
+</code></pre>
+<p>例如：</p>
+<pre><code class="language-text">/opt/data/plugins/session-recorder/session-records/2bc3c23fbd0b3be1fd710a63452ed58d.jsonl
+</code></pre>
+<p>注意：文件名来自 Hermes Agent 内部拿到的 <code>session_id</code>。它不一定等于前端或外层业务服务传入的会话 ID。排查时应该先列出容器里的最新日志文件。</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'ls -lt /opt/data/plugins/session-recorder/session-records | head -20'
+</code></pre>
+<h2>三、为什么使用 JSONL</h2>
+<p>插件使用 JSON Lines 格式，一行就是一个 JSON 对象：</p>
+<pre><code class="language-json">{&quot;event&quot;:&quot;session_start&quot;,&quot;session_id&quot;:&quot;session_51&quot;,&quot;timestamp&quot;:&quot;2026-05-25T07:04:49+00:00&quot;}
+{&quot;event&quot;:&quot;api_request&quot;,&quot;session_id&quot;:&quot;session_51&quot;,&quot;api_call_count&quot;:1,&quot;input&quot;:&quot;&quot;}
+{&quot;event&quot;:&quot;turn&quot;,&quot;session_id&quot;:&quot;session_51&quot;,&quot;input&quot;:&quot;请帮我整理这段内容&quot;,&quot;output&quot;:&quot;...&quot;}
+</code></pre>
+<p>JSONL 的好处很直接：</p>
+<ul>
+<li>可以边写边看，适合 <code>tail -f</code>。</li>
+<li>可以用 <code>grep</code> 搜索 session、关键词、字段。</li>
+<li>单行损坏通常不影响其他事件。</li>
+<li>后续容易导入 Python、jq、日志系统或数据库。</li>
+</ul>
+<h2>四、开发原理：插件注册与生命周期 Hook</h2>
+<p>插件目录很简单：</p>
+<pre><code class="language-text">session-recorder/
+  __init__.py
+  plugin.yaml
+  README.md
+</code></pre>
+<p><code>plugin.yaml</code> 声明插件信息和希望监听的 Hook：</p>
+<pre><code class="language-yaml">name: session-recorder
+version: 1.0.0
+description: &quot;Record each conversation turn input and output.&quot;
+author: &quot;Hermes Agent&quot;
+hooks:
+  - on_session_start
+  - pre_api_request
+  - post_llm_call
+  - on_session_finalize
+</code></pre>
+<p>Hermes 加载插件时会导入 <code>__init__.py</code>，执行 <code>register(ctx)</code>：</p>
+<pre><code class="language-python">def register(ctx) -&gt; None:
+    ctx.register_hook(&quot;on_session_start&quot;, _on_session_start)
+    ctx.register_hook(&quot;pre_api_request&quot;, _on_pre_api_request)
+    ctx.register_hook(&quot;post_llm_call&quot;, _on_post_llm_call)
+    ctx.register_hook(&quot;on_session_finalize&quot;, _on_session_finalize)
+</code></pre>
+<p>这就是整个插件的核心：不改 Hermes 主代码，只把处理函数挂到 Hermes 暴露的生命周期节点上。</p>
+<h3>Hook 与事件对应关系</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>生命周期 Hook</th>
+<th>触发时机</th>
+<th>注入事件</th>
+<th>主要用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on_session_start</code></td>
+<td>Hermes 会话开始</td>
+<td><code>session_start</code></td>
+<td>标记 session 文件创建和基础环境</td>
+</tr>
+<tr>
+<td><code>pre_api_request</code></td>
+<td>每次请求模型前</td>
+<td><code>api_request</code></td>
+<td>记录模型调用元信息</td>
+</tr>
+<tr>
+<td><code>post_llm_call</code></td>
+<td>一轮 LLM 调用链结束后</td>
+<td><code>turn</code></td>
+<td>记录真实用户输入和最终输出</td>
+</tr>
+<tr>
+<td><code>on_session_finalize</code></td>
+<td>Hermes 会话结束</td>
+<td><code>session_finalize</code></td>
+<td>标记会话结束状态</td>
+</tr>
+</tbody>
+</table></div>
+<p>一个用户请求不一定只对应一次 <code>api_request</code>。Hermes 可能会为了技能加载、上下文整理、工具执行、多轮推理而多次调用模型。因此日志中经常会看到多个 <code>api_request</code>，最后才出现一条 <code>turn</code>。</p>
+<h2>五、事件一：<code>session_start</code></h2>
+<p><code>session_start</code> 由 <code>on_session_start</code> Hook 注入，表示 Hermes Agent 会话开始。</p>
+<p>示例：</p>
+<pre><code class="language-json">{
+  &quot;event&quot;: &quot;session_start&quot;,
+  &quot;metadata&quot;: {},
+  &quot;model&quot;: &quot;MiniMax-M2.7-highspeed&quot;,
+  &quot;platform&quot;: &quot;api_server&quot;,
+  &quot;session_id&quot;: &quot;2bc3c23fbd0b3be1fd710a63452ed58d&quot;,
+  &quot;timestamp&quot;: &quot;2026-05-27T07:02:12+00:00&quot;
+}
+</code></pre>
+<p>主要字段：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event</code></td>
+<td>固定为 <code>session_start</code></td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td>Hermes 内部会话 ID，也是默认日志文件名</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>当前会话使用的模型</td>
+</tr>
+<tr>
+<td><code>platform</code></td>
+<td>调用来源，例如 <code>api_server</code></td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>Hook 传入的额外信息</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>UTC 时间</td>
+</tr>
+</tbody>
+</table></div>
+<p>这个事件的价值是确认插件确实被加载，并且当前会话已经开始写日志。</p>
+<h2>六、事件二：<code>api_request</code></h2>
+<p><code>api_request</code> 由 <code>pre_api_request</code> Hook 注入，表示 Hermes 即将发起一次模型请求。</p>
+<p>当前线上版本不记录 system prompt。它主要记录模型调用的元信息，例如 provider、base_url、api_mode、token 估算、当前第几次模型调用。</p>
+<p>示例：</p>
+<pre><code class="language-json">{
+  &quot;api_call_count&quot;: 1,
+  &quot;api_mode&quot;: &quot;anthropic_messages&quot;,
+  &quot;base_url&quot;: &quot;https://api.minimaxi.com/anthropic&quot;,
+  &quot;event&quot;: &quot;api_request&quot;,
+  &quot;input&quot;: &quot;&quot;,
+  &quot;messages&quot;: [],
+  &quot;metadata&quot;: {
+    &quot;approx_input_tokens&quot;: 3837,
+    &quot;max_tokens&quot;: null,
+    &quot;message_count&quot;: 2,
+    &quot;request_char_count&quot;: 15345,
+    &quot;task_id&quot;: &quot;2bc3c23fbd0b3be1fd710a63452ed58d&quot;,
+    &quot;tool_count&quot;: 26
+  },
+  &quot;model&quot;: &quot;MiniMax-M2.7-highspeed&quot;,
+  &quot;platform&quot;: &quot;api_server&quot;,
+  &quot;provider&quot;: &quot;minimax-cn&quot;,
+  &quot;request_message_count&quot;: 0,
+  &quot;session_id&quot;: &quot;2bc3c23fbd0b3be1fd710a63452ed58d&quot;,
+  &quot;timestamp&quot;: &quot;2026-05-27T07:02:12+00:00&quot;
+}
+</code></pre>
+<p>主要字段：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event</code></td>
+<td>固定为 <code>api_request</code></td>
+</tr>
+<tr>
+<td><code>api_call_count</code></td>
+<td>当前 session 中第几次模型 API 调用</td>
+</tr>
+<tr>
+<td><code>api_mode</code></td>
+<td>模型调用协议，例如 <code>anthropic_messages</code></td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td>模型供应商，例如 <code>minimax-cn</code></td>
+</tr>
+<tr>
+<td><code>base_url</code></td>
+<td>实际模型 API 地址</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>本次模型名</td>
+</tr>
+<tr>
+<td><code>input</code></td>
+<td>当前 Hook 能提取到的请求输入；提取不到时为空字符串</td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td>当前 Hook 能拿到的消息摘要；拿不到时为空数组</td>
+</tr>
+<tr>
+<td><code>request_message_count</code></td>
+<td>当前 Hook 捕获到的请求消息数量</td>
+</tr>
+<tr>
+<td><code>metadata.approx_input_tokens</code></td>
+<td>Hermes 估算的输入 token 数</td>
+</tr>
+<tr>
+<td><code>metadata.message_count</code></td>
+<td>Hermes 内部消息数量统计</td>
+</tr>
+<tr>
+<td><code>metadata.request_char_count</code></td>
+<td>请求字符数估算</td>
+</tr>
+<tr>
+<td><code>metadata.tool_count</code></td>
+<td>当前暴露给模型的工具数量</td>
+</tr>
+</tbody>
+</table></div>
+<h3>为什么 <code>api_request.input</code> 会是空的</h3>
+<p><code>api_request</code> 记录的是“模型请求级事件”，不是“用户回合事件”。</p>
+<p>当 Hook 没有拿到完整模型 payload 时，插件无法从 <code>messages</code> 中提取 user 内容，于是会出现：</p>
+<pre><code class="language-json">{
+  &quot;event&quot;: &quot;api_request&quot;,
+  &quot;input&quot;: &quot;&quot;,
+  &quot;messages&quot;: [],
+  &quot;request_message_count&quot;: 0
+}
+</code></pre>
+<p>这不代表用户发了空消息，也不代表前端传参丢了。它只表示：Hermes 确实触发了一次内部模型调用，但当前插件版本没有记录这次模型请求正文。</p>
+<p>真实用户输入应该看 <code>turn</code> 事件。</p>
+<h2>七、事件三：<code>turn</code></h2>
+<p><code>turn</code> 由 <code>post_llm_call</code> Hook 注入，表示一轮 Hermes 对话完成。</p>
+<p>它是链路排查时最重要的事件，因为它记录了真实用户输入和最终输出。</p>
+<p>示例：</p>
+<pre><code class="language-json">{
+  &quot;event&quot;: &quot;turn&quot;,
+  &quot;history_message_count&quot;: 4,
+  &quot;input&quot;: &quot;/skill example-skill 你好&quot;,
+  &quot;metadata&quot;: {},
+  &quot;model&quot;: &quot;MiniMax-M2.7-highspeed&quot;,
+  &quot;output&quot;: &quot;{\&quot;status\&quot;:\&quot;ok\&quot;,\&quot;result\&quot;:\&quot;已完成处理\&quot;}&quot;,
+  &quot;platform&quot;: &quot;api_server&quot;,
+  &quot;session_id&quot;: &quot;2bc3c23fbd0b3be1fd710a63452ed58d&quot;,
+  &quot;timestamp&quot;: &quot;2026-05-27T07:02:23+00:00&quot;
+}
+</code></pre>
+<p>主要字段：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event</code></td>
+<td>固定为 <code>turn</code></td>
+</tr>
+<tr>
+<td><code>input</code></td>
+<td>本轮用户输入</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td>Hermes 最终返回内容</td>
+</tr>
+<tr>
+<td><code>history_message_count</code></td>
+<td>当前历史消息数量</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>当前模型</td>
+</tr>
+<tr>
+<td><code>platform</code></td>
+<td>调用平台</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>Hook 附加信息</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果你想确认用户到底传了什么、技能最终输出了什么，优先看 <code>turn</code>。</p>
+<h2>八、事件四：<code>session_finalize</code></h2>
+<p><code>session_finalize</code> 由 <code>on_session_finalize</code> Hook 注入，表示会话结束。</p>
+<p>示例：</p>
+<pre><code class="language-json">{
+  &quot;completed&quot;: true,
+  &quot;event&quot;: &quot;session_finalize&quot;,
+  &quot;interrupted&quot;: false,
+  &quot;metadata&quot;: {},
+  &quot;model&quot;: &quot;MiniMax-M2.7-highspeed&quot;,
+  &quot;platform&quot;: &quot;api_server&quot;,
+  &quot;session_id&quot;: &quot;session_51&quot;,
+  &quot;timestamp&quot;: &quot;2026-05-25T07:05:10+00:00&quot;
+}
+</code></pre>
+<p>主要字段：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>completed</code></td>
+<td>会话是否正常完成</td>
+</tr>
+<tr>
+<td><code>interrupted</code></td>
+<td>是否被中断</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>Hook 附加信息</td>
+</tr>
+</tbody>
+</table></div>
+<p>当前排查中，最常看的通常是 <code>session_start</code>、<code>api_request</code> 和 <code>turn</code>。<code>session_finalize</code> 更适合做完整会话归档或统计。</p>
+<h2>九、一次真实日志怎么读</h2>
+<p>下面是一段典型日志：</p>
+<pre><code class="language-text">07:02:12 session_start
+07:02:12 api_request input=&quot;&quot;
+07:02:17 api_request input=&quot;&quot;
+07:02:23 turn input=&quot;/skill example-skill 你好&quot;
+07:02:44 api_request input=&quot;&quot;
+07:02:53 api_request input=&quot;&quot;
+07:03:19 api_request input=&quot;&quot;
+07:03:39 turn input=&quot;/skill another-example 继续处理&quot;
+</code></pre>
+<p>这代表：</p>
+<ol>
+<li>Hermes 会话在 <code>07:02:12</code> 开始。</li>
+<li>Hermes 内部先触发了两次模型调用。</li>
+<li>第一轮用户请求最终在 <code>07:02:23</code> 完成，输出了一个结构化结果。</li>
+<li>后续又进入另一个技能或处理阶段。</li>
+<li>Hermes 内部触发三次模型调用。</li>
+<li>第二轮最终在 <code>07:03:39</code> 完成，输出了下一阶段结果。</li>
+</ol>
+<p>中间多条 <code>api_request input=""</code> 是 Hermes 自己触发的内部模型请求，不是用户发送空消息。</p>
+<h2>十、写入逻辑：所有事件统一走 <code>_write_event</code></h2>
+<p>所有 Hook 最终都会调用统一的写入函数：</p>
+<pre><code class="language-python">def _write_event(session_id: str, event: dict[str, Any]) -&gt; None:
+    if _env_bool(&quot;HERMES_SESSION_RECORDER_DISABLED&quot;):
+        return
+
+    base = _recording_dir()
+    path = base / f&quot;{_safe_session_id(session_id)}.jsonl&quot;
+    line = json.dumps(event, ensure_ascii=False, sort_keys=True, default=repr)
+
+    with _LOCK:
+        base.mkdir(parents=True, exist_ok=True)
+        with path.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as fh:
+            fh.write(line + &quot;\n&quot;)
+</code></pre>
+<p>这里有几个关键点：</p>
+<ul>
+<li><code>HERMES_SESSION_RECORDER_DISABLED=1</code> 可以临时停用写入。</li>
+<li><code>_recording_dir()</code> 支持自定义日志目录。</li>
+<li><code>_safe_session_id()</code> 会清理不适合做文件名的字符。</li>
+<li><code>ensure_ascii=False</code> 保证中文按原文写入。</li>
+<li><code>_LOCK</code> 防止并发写文件时内容交叉。</li>
+</ul>
+<h2>十一、session_id 如何变成日志文件名</h2>
+<p>日志文件路径由 <code>session_id</code> 决定：</p>
+<pre><code class="language-python">path = base / f&quot;{_safe_session_id(session_id)}.jsonl&quot;
+</code></pre>
+<p><code>_safe_session_id()</code> 主要做三件事：</p>
+<ol>
+<li>空值变成 <code>unknown-session</code>。</li>
+<li>非字母、数字、下划线、点、横线的字符替换成 <code>_</code>。</li>
+<li>文件名最长截断到 180 个字符。</li>
+</ol>
+<p>例如：</p>
+<pre><code class="language-text">session/one -&gt; session_one.jsonl
+</code></pre>
+<p>哈希形式的 session id 会保持原样：</p>
+<pre><code class="language-text">2bc3c23fbd0b3be1fd710a63452ed58d.jsonl
+</code></pre>
+<h2>十二、当前版本的隐私边界</h2>
+<p>当前线上使用的是不记录 system prompt 的版本。</p>
+<p>这意味着：</p>
+<ul>
+<li>不会在 JSONL 里写入完整 <code>system_prompt</code>。</li>
+<li><code>api_request</code> 更偏向模型请求元信息。</li>
+<li>用户真实输入和最终输出仍然通过 <code>turn</code> 事件记录。</li>
+<li>如果 Hook 没有拿到 messages，<code>api_request.messages</code> 会是空数组。</li>
+</ul>
+<p>这个设计适合线上调试：既能确认 Hermes 内部是否发生了模型调用，又避免把过长、敏感、经常包含策略的 system prompt 写进日志。</p>
+<p>如果后续需要“看请求正文但不看 system”，可以扩展成只记录非 system 消息：</p>
+<pre><code class="language-json">{
+  &quot;messages&quot;: [
+    {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;...&quot;},
+    {&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;...&quot;},
+    {&quot;role&quot;: &quot;tool&quot;, &quot;content&quot;: &quot;...&quot;}
+  ]
+}
+</code></pre>
+<p>同时跳过：</p>
+<pre><code class="language-json">{&quot;role&quot;: &quot;system&quot;, &quot;content&quot;: &quot;...&quot;}
+</code></pre>
+<h2>十三、新容器启用流程</h2>
+<p>新建或重建 Hermes 容器后，需要重新拷贝并启用插件。</p>
+<p>单个容器：</p>
+<pre><code class="language-bash">cd ~/Desktop/hermes_skill
+git pull
+
+docker exec -it &lt;hermes-container&gt; sh -lc 'mkdir -p /opt/data/plugins/session-recorder'
+docker cp ~/Desktop/hermes_skill/session-recorder/. &lt;hermes-container&gt;:/opt/data/plugins/session-recorder/
+docker exec -it &lt;hermes-container&gt; sh -lc 'chown -R hermes:hermes /opt/data/plugins/session-recorder'
+docker exec -it &lt;hermes-container&gt; sh -lc 'HERMES_HOME=/opt/data /opt/hermes/.venv/bin/hermes plugins enable session-recorder'
+docker restart &lt;hermes-container&gt;
+</code></pre>
+<p>两个容器一起处理：</p>
+<pre><code class="language-bash">cd ~/Desktop/hermes_skill
+git pull
+
+for c in &lt;hermes-container-a&gt; &lt;hermes-container-b&gt;; do
+  docker exec -it &quot;$c&quot; sh -lc 'mkdir -p /opt/data/plugins/session-recorder'
+  docker cp ~/Desktop/hermes_skill/session-recorder/. &quot;$c&quot;:/opt/data/plugins/session-recorder/
+  docker exec -it &quot;$c&quot; sh -lc 'chown -R hermes:hermes /opt/data/plugins/session-recorder'
+  docker exec -it &quot;$c&quot; sh -lc 'HERMES_HOME=/opt/data /opt/hermes/.venv/bin/hermes plugins enable session-recorder'
+  docker restart &quot;$c&quot;
+done
+</code></pre>
+<p>启用提示里的 “Takes effect on next session” 很重要。启用后需要新 session 才会生效，重启容器最直接。</p>
+<h2>十四、检查插件是否启用</h2>
+<p>检查配置：</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'grep -nA6 &quot;^plugins:&quot; /opt/data/config.yaml'
+</code></pre>
+<p>期望看到：</p>
+<pre><code class="language-yaml">plugins:
+  enabled:
+  - session-recorder
+  disabled: []
+</code></pre>
+<p>检查插件文件：</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'ls -la /opt/data/plugins/session-recorder'
+</code></pre>
+<p>检查是否产生日志：</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'ls -lt /opt/data/plugins/session-recorder/session-records 2&gt;/dev/null | head -20 || echo &quot;no logs yet&quot;'
+</code></pre>
+<p>如果 <code>session-records</code> 不存在，不一定是错误。它通常会在第一次成功写入事件时创建。</p>
+<h2>十五、常用查看命令</h2>
+<p>查看最新日志文件：</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'ls -lt /opt/data/plugins/session-recorder/session-records | head -20'
+</code></pre>
+<p>查看某个 session：</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'cat /opt/data/plugins/session-recorder/session-records/&lt;session_id&gt;.jsonl'
+</code></pre>
+<p>查看最后 80 行：</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'tail -n 80 /opt/data/plugins/session-recorder/session-records/&lt;session_id&gt;.jsonl'
+</code></pre>
+<p>两个容器一起看：</p>
+<pre><code class="language-bash">for c in &lt;hermes-container-a&gt; &lt;hermes-container-b&gt;; do
+  echo &quot;===== $c =====&quot;
+  docker exec -it &quot;$c&quot; sh -lc 'ls -lt /opt/data/plugins/session-recorder/session-records 2&gt;/dev/null | head -20 || echo &quot;no logs yet&quot;'
+done
+</code></pre>
+<p>搜索关键字：</p>
+<pre><code class="language-bash">docker exec -it &lt;hermes-container&gt; sh -lc 'grep -R -n &quot;关键词&quot; /opt/data/plugins/session-recorder/session-records || echo &quot;not found&quot;'
+</code></pre>
+<h2>十六、常见问题</h2>
+<h3>1. 为什么 <code>api_request.input</code> 是空？</h3>
+<p>因为它是模型请求级事件，不是用户回合事件。当前 Hook 没拿到请求正文时，<code>input</code> 就会是空字符串。真实用户输入看 <code>turn.input</code>。</p>
+<h3>2. 为什么一个用户请求对应多条 <code>api_request</code>？</h3>
+<p>因为 Hermes 内部可能多次调用模型。技能加载、上下文整理、工具执行、最终回答，都可能触发模型请求。</p>
+<h3>3. 为什么某个容器没日志，另一个容器有日志？</h3>
+<p>说明当前请求可能实际打到了另一个 Hermes 容器。先看外层服务的 Hermes 地址配置：</p>
+<pre><code class="language-bash">grep -n &quot;HERMES_DEFAULT_PORT\|HERMES_BASE_URL&quot; .env
+</code></pre>
+<p>再分别检查两个容器：</p>
+<pre><code class="language-bash">docker ps
+</code></pre>
+<h3>4. 为什么插件目录存在，但没有 <code>session-records</code>？</h3>
+<p>目录只会在第一次写日志时创建。需要发起一次新请求，再查看。</p>
+<h3>5. 为什么启用了插件还是没有日志？</h3>
+<p>按顺序检查：</p>
+<ol>
+<li>容器是否是当前请求实际命中的容器。</li>
+<li><code>config.yaml</code> 里是否启用了 <code>session-recorder</code>。</li>
+<li>启用后是否重启或开启了新 session。</li>
+<li>插件目录权限是否归 <code>hermes:hermes</code>。</li>
+<li>当前请求是否真的进入 Hermes Agent，而不是停在外层业务服务。</li>
+</ol>
+<h2>十七、环境变量</h2>
+<p>插件支持几个环境变量：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>环境变量</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HERMES_SESSION_RECORDER_DIR</code></td>
+<td>自定义日志目录</td>
+</tr>
+<tr>
+<td><code>HERMES_SESSION_RECORDER_DISABLED=1</code></td>
+<td>临时停用日志写入</td>
+</tr>
+<tr>
+<td><code>HERMES_SESSION_RECORDER_MAX_CHARS</code></td>
+<td>限制单个文本字段最大长度</td>
+</tr>
+<tr>
+<td><code>HERMES_SESSION_RECORDER_MARK_BOUNDARIES=0</code></td>
+<td>不写 session start / finalize 边界事件</td>
+</tr>
+</tbody>
+</table></div>
+<p>当前线上版本不记录 system prompt，因此不建议在博客里展示 system 相关日志样例。</p>
+<h2>十八、后续可增强点</h2>
+<p>当前插件已经能回答“请求有没有进入 Hermes”“触发了几次模型调用”“最终输出是什么”。后续还可以增强：</p>
+<ul>
+<li>给 <code>api_request</code> 增加耗时字段。</li>
+<li>给 <code>turn</code> 增加本轮总耗时。</li>
+<li>只记录非 system messages，方便排查上下文传递。</li>
+<li>增加 <code>error</code> 事件，记录异常栈摘要。</li>
+<li>增加 <code>container_id</code> 或 <code>port</code> 字段，方便区分多个 Hermes 容器。</li>
+<li>增加日志轮转，避免长期运行后文件过大。</li>
+</ul>
+<h2>总结</h2>
+<p><code>session-recorder</code> 的关键不在于“多写几行日志”，而在于它挂到了 Hermes Agent 的生命周期 Hook 上。</p>
+<p>外层 HTTP 日志看到的是接口请求。Session Recorder 看到的是 Agent 内部事件：</p>
+<ul>
+<li>会话什么时候开始。</li>
+<li>模型请求什么时候发生。</li>
+<li>一轮用户请求最终输出了什么。</li>
+<li>会话什么时候结束。</li>
+</ul>
+<p>对复杂 Agent 工作流来说，这类日志比单纯的接口日志更接近问题现场。它让我们能把一次黑盒调用拆成可追踪的事件序列，也让“是不是 Hermes 自己触发的”“为什么 input 是空的”“到底命中了哪个容器”这些问题变得可以直接验证。</p>
+        </div>
+    </article>
+    <div id="footer-placeholder"></div>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+        mermaid.initialize({ startOnLoad: true, theme: "default", securityLevel: "loose" });
+    </script>
+    <script src="../components/load-components.js"></script>
+    <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
+</body>
+</html>
