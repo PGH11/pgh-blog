@@ -3,323 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LangGraph Agent 测试笔记：视频创作图的状态与分支验收 | PGH Blog</title>
+    <title>LangGraph Agent 测试笔记：视频创作 Agent 的状态、任务与服务化验收 | PGH Blog</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://pgh11.github.io/pgh-blog/styles.css">
     <style>
         .post-header { padding: 160px 24px 60px; background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), var(--bg-primary); }
-        .post-container { max-width: 800px; margin: 0 auto; }
+        .post-container { max-width: 880px; margin: 0 auto; }
         .post-title { font-size: 42px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; }
-        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
         .post-category { padding: 6px 16px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border-radius: 20px; font-size: 13px; font-weight: 600; }
         .post-date { color: var(--text-tertiary); font-size: 15px; }
+        .post-summary { color: var(--text-secondary); font-size: 18px; line-height: 1.8; max-width: 780px; }
         .post-content { padding: 40px 24px 80px; }
-        .post-content h2 { font-size: 28px; font-weight: 600; margin: 40px 0 20px; color: var(--text-primary); }
-        .post-content h3 { font-size: 22px; font-weight: 600; margin: 32px 0 16px; color: var(--text-primary); }
-        .post-content p { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; font-size: 17px; }
-        .post-content ul { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
-        .post-content ol { color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; padding-left: 24px; }
-        .post-content li { margin-bottom: 12px; font-size: 17px; }
+        .post-content h1 { font-size: 34px; font-weight: 700; margin: 24px 0 24px; color: var(--text-primary); }
+        .post-content h2 { font-size: 28px; font-weight: 600; margin: 42px 0 20px; color: var(--text-primary); }
+        .post-content h3 { font-size: 22px; font-weight: 600; margin: 34px 0 16px; color: var(--text-primary); }
+        .post-content h4 { font-size: 18px; font-weight: 600; margin: 28px 0 14px; color: var(--text-primary); }
+        .post-content p { color: var(--text-secondary); line-height: 1.85; margin-bottom: 20px; font-size: 17px; }
+        .post-content ul, .post-content ol { color: var(--text-secondary); line-height: 1.8; margin-bottom: 22px; padding-left: 24px; }
+        .post-content li { margin-bottom: 10px; font-size: 17px; }
+        .post-content a { color: #3b82f6; text-decoration: none; }
+        .post-content a:hover { text-decoration: underline; }
         .post-content code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #3b82f6; }
-        .post-content pre { background: var(--bg-secondary); padding: 20px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; }
+        .post-content pre { background: var(--bg-secondary); padding: 20px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; border: 1px solid var(--border-color); }
         .post-content pre code { background: none; padding: 0; color: var(--text-primary); font-size: 14px; line-height: 1.8; }
+        .post-content .mermaid { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin: 28px 0; overflow-x: auto; text-align: center; }
+        .post-content .mermaid svg { max-width: 100%; height: auto; }
         .post-content blockquote { border-left: 4px solid #3b82f6; padding-left: 20px; margin: 24px 0; color: var(--text-tertiary); font-style: italic; }
+        .post-content figure { margin: 32px 0; }
+        .post-content img { width: 100%; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-secondary); }
+        .table-wrap { overflow-x: auto; margin: 28px 0; border: 1px solid var(--border-color); border-radius: 12px; }
+        .post-content table { width: 100%; border-collapse: collapse; min-width: 640px; }
+        .post-content th, .post-content td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary); vertical-align: top; }
+        .post-content th { color: var(--text-primary); background: var(--bg-secondary); font-weight: 600; }
         .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #3b82f6; text-decoration: none; font-weight: 500; margin-bottom: 32px; transition: transform 0.3s ease; }
         .back-btn:hover { transform: translateX(-4px); }
-        @media (max-width: 768px) { .post-title { font-size: 32px; } }
+        @media (max-width: 768px) { .post-title { font-size: 32px; } .post-container { max-width: 100%; } }
     </style>
 </head>
 <body>
     <div class="theme-toggle" id="themeToggle">
-        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line></svg>
-        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
     </div>
     <div id="navbar-placeholder"></div>
-<section class="post-header">
+    <section class="post-header">
         <div class="post-container">
             <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
-            <h1 class="post-title">LangGraph Agent 测试笔记：视频创作图的状态与分支验收</h1>
+            <h1 class="post-title">LangGraph Agent 测试笔记：视频创作 Agent 的状态、任务与服务化验收</h1>
             <div class="post-meta"><span class="post-category">AI 测试</span><span class="post-date">2026年5月13日</span></div>
+            <p class="post-summary">记录视频创作 Agent 如何围绕 LangGraph 状态、分支、异步任务、工具调用和前端流式输出做服务化验收。</p>
         </div>
     </section>
     <article class="post-content">
         <div class="post-container">
-            <h2>LangGraph Agent 测试笔记：视频创作图的状态与分支验收</h2>
-
-<p>这篇和 [<code>SKILL_TESTING_BLOG.md</code>](./SKILL_TESTING_BLOG.md) 是一套思路的两头：</p>
-
-<ul>
-<li>Skill 那头：脚本能不能独立把 API、记忆、检索跑通；</li>
-<li>这篇：图上这一圈节点（路由、结构化输出、反思、工具、RAG、记忆）<strong>状态和分支</strong>对不对。</li>
-</ul>
-
-<p>合在一起才敢说「端到端用得出去」。单测聊天回复好看，信息量不够。</p>
-
-<p>---</p>
-
-<h2>一、本轮 Agent 完整流转（与代码对齐）</h2>
-
-<p>下面按<strong>真实编译图</strong>写，对应 <code>video_agent/graph/builder.py</code> 里的边和 <code>video_agent/graph/routing.py</code> 里的条件函数。CLI 每处理用户一行输入，就是一次 <code>app.invoke</code>：从 <code>START</code> 走到 <code>END</code>，全程读写同一个 <code>CreativeState</code>。</p>
-
-<h3>公共前缀（三条业务分支前都一样）</h3>
-
-<ul>
-<li><strong><code>START</code> → <code>memory_retriever</code></strong> — 读本地 <code>user_memory.json</code>，注入 <code>long_term_memory</code>。</li>
-<li><strong><code>memory_retriever</code> → <code>retrieval_router</code></strong> — 结构化模型决定本轮是否需要 RAG；写入 <code>should_retrieve</code>、<code>retrieval_query</code>；清空上轮 <code>rag_context</code>。</li>
-<li><strong><code>retrieval_router</code> → 条件边 <code>route_after_retrieval</code></strong> — 有检索意图且有 query → <code>rag_retriever</code>；否则跳过到 <code>intent_router</code>。若进了 <code>rag_retriever</code>，下一跳固定到 <code>intent_router</code>。</li>
-<li><strong><code>intent_router</code></strong> — Python 快捷分支：含图片 URL + 图生关键词 → 直接设 <code>route="i2v"</code>；否则调路由模型，在 <code>chat</code> / <code>creative</code> / <code>i2v</code> 里选。</li>
-<li><strong><code>intent_router</code> → 条件边 <code>route_by_intent</code></strong> — 纯映射 <code>route</code> → 下一节点：<code>chat</code>→<code>chat_responder</code>，<code>creative</code>→<code>creative_worker</code>，<code>i2v</code>→<code>asset_resolver</code>。</li>
-</ul>
-
-<h3>分支 A：闲聊 <code>chat</code></h3>
-
-<p><pre><code>chat_responder → memory_writer → END
-</code></pre></p>
-
-<p>不经过 <code>reflection_worker</code>、<code>tool_executor</code>。</p>
-
-<h3>分支 B：文生 <code>creative</code></h3>
-
-<p><pre><code>creative_worker → reflection_worker → 条件边 route_after_reflection → memory_writer 或 tool_executor → memory_writer → END
-</code></pre></p>
-
-<h3>分支 C：图生 <code>i2v</code></h3>
-
-<p><pre><code>asset_resolver → i2v_worker → reflection_worker →（与分支 B 相同的条件边）→ …
-</code></pre></p>
-
-<h3>条件边一览</h3>
-
-<h3>流程图</h3>
-
-<p><pre><code>flowchart TD
-  START([START]) --&gt; MR[memory_retriever]
-  MR --&gt; RR[retrieval_router]
-  RR --&gt;|retrieve| RAG[rag_retriever]
-  RR --&gt;|skip| IR[intent_router]
-  RAG --&gt; IR
-  IR --&gt;|chat| CHAT[chat_responder]
-  IR --&gt;|creative| CW[creative_worker]
-  IR --&gt;|i2v| AR[asset_resolver]
-  AR --&gt; I2V[i2v_worker]
-  CHAT --&gt; MW[memory_writer]
-  CW --&gt; REF[reflection_worker]
-  I2V --&gt; REF
-  REF --&gt;|tool| TE[tool_executor]
-  REF --&gt;|end| MW
-  TE --&gt; MW
-  MW --&gt; END([END])
-</code></pre></p>
-
-<p>---</p>
-
-<h2>二、先分清两层：工具层 vs 图编排层</h2>
-
-<code>litmedia_client</code> 里的 <code>@tool</code> 和底层 HTTP，最好能在<strong>不写 Agent</strong> 的情况下先验一遍。和 Skill 篇的主张一样：<strong>底座绿了再上编排</strong>，否则报错堆在一起很难拆。
-
-<p>图这一层只管：这轮用户话说完以后，<code>CreativeState</code> 里哪些字段变了、有没有走错边、该不该点工具。</p>
-
-<p>---</p>
-
-<h2>三、别拿「Assistant 回了话」当通过标准</h2>
-
-<p>更值得盯的是：</p>
-
-<p>一句话：<strong>先看状态机，<code>reply</code> 是结果之一不是唯一裁判。</strong></p>
-
-<p>---</p>
-
-<h2>四、各分支验收时盯什么</h2>
-
-<h3>闲聊</h3>
-
-<ul>
-<li><code>route == chat</code>，应出现 <code>chat_responder</code>，不进 <code>creative_worker</code> / <code>i2v_worker</code>。</li>
-<li>不调用 <code>submit_*</code> 工具。</li>
-<li><code>memory_writer</code> 仍会跑，但不应该把闲聊内容写进记忆（验证 <code>should_write</code>）。</li>
-</ul>
-
-<h3>文生（creative）</h3>
-
-<ul>
-<li><code>route == creative</code> → <code>creative_worker</code> → <code>reflection_worker</code>。</li>
-<li>模糊一句话不应直接提交；明确确认后才应走到 <code>tool_executor</code>。</li>
-<li><code>reflection_worker</code> 若 <code>should_block_tool</code>，图上应拿不到 tool 分支。</li>
-<li><code>tool_call.tool_name</code> 应为 <code>submit_text_to_video</code>，不是旧的 <code>submit_video_generation</code>。</li>
-</ul>
-
-<h3>图生（i2v）</h3>
-
-<ul>
-<li>有图 URL 且意图明确时应能进 <code>asset_resolver</code>、<code>i2v_worker</code>。</li>
-<li><code>params.source_image_url</code> 或 <code>resolved_image_url</code> 应对齐。</li>
-<li>缺图时不应还带 <code>submit_image_to_video</code>。</li>
-<li>如果 AI 误返回 <code>submit_text_to_video</code>，<code>i2v_worker</code> 内应自动纠正。</li>
-</ul>
-
-<h3>RAG</h3>
-
-<ul>
-<li><code>retrieval_router</code> 决定要不要检索；不该每轮无脑查。</li>
-<li>若走了检索，<code>retrieval_query</code> 和召回 <code>rag_sources</code> 应对得上问题类型。</li>
-<li><code>rag_service</code> 是本地 Markdown 关键词匹配，不是向量检索；测试时要注意中文分词粒度。</li>
-</ul>
-
-<h3>长期记忆</h3>
-
-<ul>
-<li><code>memory_writer</code> 的写入要有门槛（模型判断 + Python 置信度），避免把一次性废话写进去。</li>
-<li><code>confirmed_prompt</code> 类别只保留最近 5 条。</li>
-<li>旧版 5 个数组格式的 <code>user_memory.json</code> 能自动迁移。</li>
-</ul>
-
-<p>---</p>
-
-<h2>五、完整测试方法</h2>
-
-<h3>5.1 测试准备</h3>
-
-<ul>
-<li>固定测试环境（Python 版本、依赖版本、模型配置）。</li>
-<li>准备好 <code>ARK_API_KEY</code>、LitMedia 相关密钥和 endpoint。</li>
-<li>打开 DEBUG 日志。</li>
-<li>若用 LangSmith，先确认项目名、API key、运行后能看到 trace。</li>
-<li>确认 <code>langchain_openai</code> 版本和 <code>with_structured_output</code> 的 <code>method</code> 参数一致。</li>
-</ul>
-
-<h3>5.2 覆盖范围（按风险维度）</h3>
-
-<ul>
-<li><strong>路径覆盖</strong>：闲聊、文生、图生、检索、记忆、提交/不提交。</li>
-<li><strong>状态覆盖</strong>：<code>route</code>、<code>params</code>、<code>awaiting_confirmation</code>、<code>tool_call</code> 的关键组合。</li>
-<li><strong>资源覆盖</strong>：有图/无图、资源合法/不合法、资源缺失后的降级。</li>
-<li><strong>异常覆盖</strong>：结构化空返回、工具超时、接口报错、字段缺失。</li>
-<li><strong>边界覆盖</strong>：长输入、模糊输入、多轮改写、连续确认/取消。</li>
-<li><strong>观测覆盖</strong>：每个关键阶段都能在日志或 trace 里定位。</li>
-</ul>
-
-<h3>5.3 执行顺序（不要跳步）</h3>
-
-<ul>
-<li><strong>静态层</strong>：<code>py_compile</code> + import 验证。</li>
-<li><strong>工具层冒烟</strong>：直接验证 <code>submit_text_to_video</code> / <code>submit_image_to_video</code>。</li>
-<li><strong>图路径层</strong>：覆盖主要分支，只看路由和状态。</li>
-<li><strong>提交层</strong>：确认 <code>reflection → tool_executor</code> 的放行与拦截。</li>
-<li><strong>RAG/记忆层</strong>：确认触发条件、输出结构和写入边界。</li>
-<li><strong>异常恢复层</strong>：验证结构化空返回的重试/降级，确保进程不崩。</li>
-</ul>
-
-<h3>5.4 判定标准</h3>
-
-<ul>
-<li><strong>流程正确</strong>：节点路径和分支选择符合设计。</li>
-<li><strong>状态正确</strong>：关键状态字段变化符合预期，不出现越权提交。</li>
-<li><strong>结果正确</strong>：工具执行、检索、记忆写入与用户意图一致。</li>
-</ul>
-
-<h3>5.5 失败后的定位顺序</h3>
-
-<ul>
-<li>先看 <code>intent_router</code>（路由是否错）。</li>
-<li>再看业务节点（<code>creative_worker</code> / <code>i2v_worker</code> 的结构化输出）。</li>
-<li>再看 <code>reflection_worker</code>（是不是被拦了）。</li>
-<li>最后看 <code>tool_executor</code>（入参是否拼错、接口是否失败）。</li>
-<li>如果是偶发错，看 <code>structured_output_observation</code>（首空/重试恢复/二次仍空）。</li>
-</ul>
-
-<p>---</p>
-
-<h2>六、结构化输出：实际踩过的坑和预防</h2>
-
-<h3>6.1 <code>method</code> 参数必须显式指定</h3>
-
-<code>langchain_openai</code> 版本不同，<code>with_structured_output()</code> 默认 method 可能从 <code>function_calling</code> 变成 <code>json_schema</code>。如果底层模型不支持 <code>json_schema</code>，报 400。
-
-<p>当前代码显式写：</p>
-
-<p><pre><code>router_llm = llm.with_structured_output(RouteDecision, method="function_calling")
-creative_llm = llm.with_structured_output(CreativeUnderstanding, method="function_calling")
-reflection_llm = llm.with_structured_output(ReflectionResult, method="function_calling")
-memory_llm = llm.with_structured_output(MemoryWriteDecision, method="function_calling")
-retrieval_llm = llm.with_structured_output(RetrievalDecision, method="function_calling")
-</code></pre></p>
-
-<strong>经验：不要依赖默认值。</strong> 不同环境安装的版本可能不同，这就是"公司能用家里不能用"的典型原因。
-
-<h3>6.2 模型偶发空返回</h3>
-
-<p>处理方式（<code>invoke_structured_with_recovery</code>）：</p>
-
-<ul>
-<li>主路径：正常结构化调用。</li>
-<li>第一次拿到 <code>None</code>：追加 HumanMessage 重试一次。</li>
-<li>还不行：返回 <code>None</code>，节点用 <code>ensure_creative_understanding</code> 兜底 + <code>generate_clarification_reply</code> 动态生成追问。</li>
-<li>观测：DEBUG 日志里有 <code>structured_output_observation</code>，区分「首空」「重试恢复」「二次仍空」。</li>
-</ul>
-
-<p>---</p>
-
-<h2>七、和 LangSmith / 终端相关的杂项</h2>
-
-<ul>
-<li><strong>LangSmith</strong>：一棵树对应一轮 <code>invoke</code>；节点名对上 <code>builder.py</code> 里的 <code>add_node</code>。细节见 [<code>LangSmith_测试经验.md</code>](./LangSmith_测试经验.md)。</li>
-<li><strong>Windows 控制台</strong>：回复带 emoji 时 <code>print</code> 可能 <code>UnicodeEncodeError</code>，CLI 侧用 <code>utf-8</code>/<code>errors=replace</code> 兜底。</li>
-<li><strong>工具名变更</strong>：旧版叫 <code>submit_video_generation</code>，当前代码是 <code>submit_text_to_video</code> / <code>submit_image_to_video</code>，以代码为准。</li>
-<li><strong><code>FrontendParams</code> 新增字段</strong>：<code>open_filter</code>、<code>sound_effect_switch</code>、<code>seed</code>、<code>is_feed</code> 在工具调用时要合并到 payload，测试时确认没漏。</li>
-</ul>
-
-<p>---</p>
-
-<h2>八、容易被忽略的边角</h2>
-
-<strong>路由只靠模型也会飘</strong> — 有「关键词 + URL」的快捷路径时，和纯模型路由要能互相印证；改 prompt 后以固定话术矩阵回归。
-
-<strong>反思层与工具层的一致性</strong> — <code>reflection_worker</code> 拦了工具后，<code>reply</code>/<code>awaiting_confirmation</code> 是否被清回合理状态，避免用户以为已经提交了。
-
-<strong>I2V 与文生工具的混用</strong> — 模型有时在图生路径吐 <code>submit_text_to_video</code>，<code>i2v_worker</code> 内会自动纠正，这一项要单独验。
-
-<strong>RAG 与记忆的「有没有」</strong> — 没检索不等于坏；写入记忆过少或过多都值得看 <code>reason</code>/<code>should_write</code>。
-
-<strong>图生路径缺图的多层保护</strong> — <code>i2v_worker</code> 压 tool → <code>reflection_worker</code> 硬拦截 → <code>route_after_reflection</code> 三重检查，确保缺图时不误提交。
-
-<p>---</p>
-
-<h2>九、发版前检查单</h2>
-
-<ul>
-<li>工具层：<code>submit_text_to_video</code> / <code>submit_image_to_video</code> 最小可调用。</li>
-<li>图：<code>py_compile</code>/import 整个 <code>video_agent</code> 无语法错误。</li>
-<li>覆盖矩阵：确保 chat / creative / i2v / RAG / 记忆 / 异常都被覆盖。</li>
-<li>结构化：<code>function_calling</code> 路径可用；验证空返回的重试/降级不崩进程。</li>
-<li><code>method</code> 参数：所有 <code>with_structured_output</code> 都显式写了 <code>method="function_calling"</code>。</li>
-<li>LangSmith（若启用）：项目名称、API key、<code>run_name</code>/<code>metadata</code> 是否方便筛查。</li>
-<li>Windows：CLI 跑一次带特殊字符的回复无编码崩。</li>
-<li>记忆：闲聊不应写入长期记忆；<code>confirmed_prompt</code> 不超过 5 条。</li>
-</ul>
-
-<p>---</p>
-
-<h2>十、小结</h2>
-
-<strong>Skill 测的是脚本和接口；Agent 测的是状态和分支。</strong> 两篇文档叠在一起：<strong>底下命令行能闭环，上头状态机不超范围、不坏在空 JSON</strong>，再谈上线心里会踏实得多。
-
-<p>---</p>
-
-<strong>关联文档</strong>
-
-<ul>
-<li>[<code>SKILL_TESTING_BLOG.md</code>](./SKILL_TESTING_BLOG.md)：Skill / 脚本分层测试</li>
-<li>[<code>LangSmith_测试经验.md</code>](./LangSmith_测试经验.md)：tracing 树上每个节点看什么</li>
-<li>[<code>LangGraph_LangChain_学习笔记.md</code>](./LangGraph_LangChain_学习笔记.md)：实现与概念（以 <code>video_agent/models.py</code> 为准）</li>
-</ul>
-
+            <h1>LangGraph Agent 测试笔记：视频创作 Agent 的状态、任务与服务化验收</h1>
+<p>我这个 Agent 的核心目标很明确：做一个视频创作助手。它既能帮用户做文生视频，也能做图生视频；既能扩写 prompt、调整风格、补充镜头，也能在用户确认后真正提交生成任务。</p>
+<p>这类 Agent 不能只看“模型回答得像不像”。真正要验收的是：它能不能分清用户意图，能不能记住当前会话，能不能处理多轮修改，能不能在调用外部视频工具前做确认，能不能被前端稳定调用。</p>
+<p>所以这篇文章主要记录我现在这个视频 Agent 的架构，以及我怎么围绕 LangGraph 的状态、分支、异步任务和前端流式输出做测试。</p>
+<hr>
+<h2>一、当前 Agent 架构</h2>
+<p>现在这个视频创作 Agent 已经不是单纯的 CLI 脚本，而是拆成了三层：</p>
+<pre><code class="language-text">前端页面
+  -&gt; POST /tasks
+FastAPI 任务 API
+  -&gt; 后台任务执行
+LangGraph 视频创作 Agent
+  -&gt; LLM / RAG / Memory / LitMedia Tool
+</code></pre>
+<p>前端创建任务后，后端会立刻返回 <code>task_id</code>。Agent 在后台执行，前端通过 SSE 订阅任务事件流，实时看到任务状态。</p>
+<pre><code class="language-text">POST /tasks
+GET  /tasks/{task_id}
+GET  /tasks/{task_id}/events
+</code></pre>
+<p>这个结构把几个边界先拆清楚了：</p>
+<pre><code class="language-text">API 层负责接请求
+Task Store 负责保存任务状态
+Task Runner 负责执行 Agent
+LangGraph 负责业务图和状态流转
+</code></pre>
+<p>以后如果要做分布式，可以把后台线程换成 Celery/RQ，把本地状态换成 Redis 或 Postgres。接口层不用大改。</p>
+<hr>
+<h2>二、LangGraph 主流程</h2>
+<p>当前 Agent 的主链路可以概括为：</p>
+<pre><code class="language-text">memory_retriever
+  -&gt; routing_planner
+  -&gt; rag_retriever?
+  -&gt; route_by_intent
+</code></pre>
+<p><code>routing_planner</code> 是入口规划节点，一次结构化输出同时判断三件事：</p>
+<pre><code class="language-text">route: chat / creative / i2v
+should_retrieve: true / false
+retrieval_query: string | null
+</code></pre>
+<p>也就是说，它既判断用户是普通聊天、文生视频，还是图生视频，也判断本轮是否需要 RAG 检索。</p>
+<p>当前主流程大概是这样：</p>
+<div class="mermaid">
+flowchart TD
+  START([START]) --> MR[memory_retriever]
+  MR --> RP[routing_planner]
+  RP -->|retrieve| RAG[rag_retriever]
+  RP -->|skip| RI[route_by_intent]
+  RAG --> RI
+  RI -->|chat| CHAT[chat_responder]
+  RI -->|creative| CW[creative_worker]
+  RI -->|i2v| AR[asset_resolver]
+  AR --> I2V[i2v_worker]
+  CW --> RAC{route_after_creation}
+  I2V --> RAC
+  RAC -->|tool needed| REF[reflection_worker]
+  RAC -->|no tool| ME[memory_enqueue]
+  REF -->|tool| TE[tool_executor]
+  REF -->|end| ME
+  CHAT --> ME
+  TE --> ME
+  ME --> END([END])
+</div>
+
+<p>这里最重要的是：Agent 不是每一轮都直接生成视频。它会先理解用户意图，再决定是闲聊、补全 prompt、修改已有方案，还是提交工具调用。</p>
+<hr>
+<h2>三、Agent 能处理哪些用户输入</h2>
+<p>这个 Agent 主要覆盖几类请求。</p>
+<p>第一类是能力咨询，比如：</p>
+<pre><code class="language-text">你好
+你能做什么
+你可以帮我生成视频吗
+</code></pre>
+<p>这种情况下，Agent 要自然说明自己是视频创作助手，可以帮用户做文生视频和图生视频，也可以扩写 prompt、设计镜头、调整风格和优化负面词。</p>
+<p>第二类是文生视频，比如：</p>
+<pre><code class="language-text">帮我生成一段雨夜城市街角的小狗视频
+</code></pre>
+<p>Agent 会把用户的一句话扩成更完整的视频 prompt，并结合默认参数，例如比例、清晰度、时长等。</p>
+<p>第三类是图生视频，比如：</p>
+<pre><code class="language-text">用这张图生成一个镜头推进的视频
+</code></pre>
+<p>这时 Agent 会先解析图片资源，再生成适合图生视频的运动描述和镜头语言。</p>
+<p>第四类是多轮修改，比如：</p>
+<pre><code class="language-text">换成新海诚风格
+分辨率改成 1080p
+不要水印
+就按这个生成
+</code></pre>
+<p>这些输入都依赖会话状态。Agent 需要记住当前 prompt、参数、确认状态，以及上一轮用户到底在改什么。</p>
+<hr>
+<h2>四、会话状态怎么保存</h2>
+<p>前端有两个关键字段：</p>
+<pre><code class="language-text">User ID
+Thread ID
+</code></pre>
+<p><code>User ID</code> 表示谁在使用，<code>Thread ID</code> 表示这个用户的哪一段会话。</p>
+<p>如果一直使用：</p>
+<pre><code class="language-text">user_id = demo
+thread_id = demo-thread
+</code></pre>
+<p>Agent 会把它当成同一条对话。用户说“改成更治愈一点”“就用第二个”“确认生成”时，Agent 能根据同一个 <code>thread_id</code> 找回上下文。</p>
+<p>当前线程状态会持久化到：</p>
+<pre><code class="language-text">memory/threads/
+</code></pre>
+<p>每个 <code>thread_id</code> 对应一个状态文件。服务重启后，再使用同一个 <code>thread_id</code>，就能读回之前的 <code>CreativeState</code>。</p>
+<p>这一步对 Agent 服务化很重要。因为前端、API、Worker 不一定永远在同一个进程里，状态必须从“进程内记忆”逐步变成“可恢复的会话状态”。</p>
+<hr>
+<h2>五、为什么 Agent 会慢</h2>
+<p>LangSmith 里最值得看的不是总耗时，而是 token breakdown。</p>
+<p>我观察过一次长会话 trace：</p>
+<pre><code class="language-text">Input: 58.5K
+Output: 12.7K
+Total: 71.2K
+P50: 23.45s
+P99: 58.85s
+</code></pre>
+<p>这说明慢的主要原因不是“构建图”，而是每一轮塞给 LLM 的上下文太大。</p>
+<p>Agent 聊得越久，<code>chat_history</code> 越长。如果每个节点都塞最近 8 到 10 条历史，多个 LLM 节点叠加起来，输入 token 会膨胀得很快。</p>
+<p>所以我对历史做了两层控制：</p>
+<pre><code class="language-text">保存会话时：最多保留最近 12 条 chat_history
+调用节点时：不同节点只读取自己需要的短窗口
+</code></pre>
+<p>这里的关键点是：当前视频 prompt、确认状态、前端参数已经在 <code>params</code> 和 <code>frontend_params</code> 里，不需要每次把完整聊天历史重新塞进模型。</p>
+<hr>
+<h2>六、记忆写入不能阻塞用户响应</h2>
+<p>每轮对话结束后，Agent 都需要更新长期记忆。但记忆抽取本身也可能调用 LLM。</p>
+<p>对用户来说，回复已经生成了，就不应该继续等记忆写入完成。否则体感上就是：Agent 明明答完了，却还卡着不返回。</p>
+<p>现在主链路最后走的是：</p>
+<pre><code class="language-text">memory_enqueue
+</code></pre>
+<p>主流程只负责启动后台写入，然后结束本轮响应。记忆写入失败不会影响本轮回复。</p>
+<p>生产环境里，这一步可以继续演进成：</p>
+<pre><code class="language-text">memory_enqueue -&gt; Redis/Celery -&gt; memory worker
+</code></pre>
+<p>这相当于把“用户响应路径”和“后台维护路径”拆开。对 Agent 来说，这是很重要的延迟优化。</p>
+<hr>
+<h2>七、结构化输出要能容错</h2>
+<p>Agent 里有很多结构化输出，例如意图识别、路由规划、工具调用判断。结构化输出的好处是稳定，坏处是模型稍微跑偏就可能触发校验错误。</p>
+<p>比如模型可能返回：</p>
+<pre><code class="language-text">clarification
+</code></pre>
+<p>但 schema 里希望的是：</p>
+<pre><code class="language-text">clarify
+</code></pre>
+<p>如果不做处理，整个任务会直接失败。</p>
+<p>所以我在 Pydantic schema 层做了归一化，把常见别名映射成系统内部标准值：</p>
+<pre><code class="language-text">clarification -&gt; clarify
+ask_clarification -&gt; clarify
+edit_prompt -&gt; update_prompt
+generate -&gt; create_prompt
+submit -&gt; confirm
+text_to_video -&gt; submit_text_to_video
+i2v -&gt; image_to_video
+replace -&gt; overwrite
+normal -&gt; chat
+</code></pre>
+<p>这类容错很关键。线上 Agent 面对的是自然语言和模型输出，不是严格 API 调用。schema 不能脆到一有同义词就崩。</p>
+<hr>
+<h2>八、反思节点按需运行</h2>
+<p>视频生成属于有副作用的动作。真正提交工具前，Agent 需要确认参数、prompt 和工具调用是否合理。</p>
+<p>所以图里保留了：</p>
+<pre><code class="language-text">reflection_worker
+</code></pre>
+<p>但它不是每一轮都需要跑。</p>
+<p>如果用户只是让 Agent 改 prompt、换风格、补镜头，这一轮没有外部工具调用，就不需要额外反思。只有当 <code>tool_call</code> 准备调用下面这些工具时，才进入反思节点：</p>
+<pre><code class="language-text">submit_text_to_video
+submit_image_to_video
+</code></pre>
+<p>这样既减少一次 LLM 调用，也让图的语义更清楚：只有要执行外部副作用时，才做额外检查。</p>
+<hr>
+<h2>九、前端流式输出流的是什么</h2>
+<p>现在前端使用 SSE：</p>
+<pre><code class="language-text">GET /tasks/{task_id}/events
+</code></pre>
+<p>当前流的是任务事件：</p>
+<pre><code class="language-text">task_created
+task_running
+agent_started
+graph_building
+graph_running
+reply_ready
+state_saved
+task_completed
+task_failed
+</code></pre>
+<p>这解决的是“前端能不能实时看到任务进度”的问题。</p>
+<p>它还不是 token-by-token 的 LLM 流式输出。当前 LangGraph 执行主要还是：</p>
+<pre><code class="language-python">graph.invoke(...)
+</code></pre>
+<p>如果要做到真正的 token 流式输出，需要继续改成：</p>
+<pre><code class="language-python">graph.astream(...)
+</code></pre>
+<p>或者在 LLM 节点内部接流式回调，把 token 事件写进 task event stream。</p>
+<p>我现在先把任务状态流打通，再继续往 token 级流式输出推进。</p>
+<hr>
+<h2>十、测试重点</h2>
+<p>这个 Agent 的测试重点不是证明模型每次都聪明，而是证明系统在多轮会话、模型轻微抖动、工具调用和服务重启后不会断。</p>
+<p>第一类是图路径测试：</p>
+<pre><code class="language-text">chat 是否进入 chat_responder
+creative 是否进入 creative_worker
+i2v 是否先解析图片 URL
+有 tool_call 时是否进入 reflection
+没有 tool_call 时是否跳过 reflection
+</code></pre>
+<p>第二类是任务 API 测试：</p>
+<pre><code class="language-text">create_task 是否生成 task_id
+run_agent_task 是否保存 completed / failed
+同一个 thread_id 是否能保存并读回状态
+</code></pre>
+<p>第三类是结构化容错测试：</p>
+<pre><code class="language-text">clarification 是否归一化成 clarify
+edit_prompt 是否归一化成 update_prompt
+i2v 是否归一化成 image_to_video
+text_to_video 是否归一化成 submit_text_to_video
+</code></pre>
+<p>这些测试的价值在于：不要求模型永远输出最标准的词，但要求系统能接住常见偏差。</p>
+<hr>
+<h2>十一、下一步分布式演进</h2>
+<p>现在这套结构已经接近一个 Agent 服务：</p>
+<pre><code class="language-text">前端
+  -&gt; FastAPI
+  -&gt; Task Store
+  -&gt; Task Runner
+  -&gt; LangGraph Agent
+  -&gt; SSE 返回事件
+</code></pre>
+<p>后面可以按这个顺序继续演进：</p>
+<pre><code class="language-text">1. InMemoryTaskStore -&gt; SQLite/Postgres
+2. 后台线程 -&gt; Celery/RQ Worker
+3. 本地 thread_state 文件 -&gt; LangGraph checkpointer / Postgres
+4. SSE 任务事件 -&gt; token 级流式输出
+5. 单机 Worker -&gt; 多 Worker + 幂等工具调用
+</code></pre>
+<p>这条路线的核心不是一上来就堆分布式组件，而是先把边界抽清楚。只要 API、任务状态、会话状态、Agent 执行器之间的职责稳定，后面替换存储和队列就会自然很多。</p>
+<hr>
+<h2>小结</h2>
+<p>做 Agent 不只是写 prompt。真正让它可用的，是一圈工程护栏：</p>
+<pre><code class="language-text">路由少打模型
+记忆不阻塞响应
+会话能持久化
+历史不能无限膨胀
+结构化输出要能容错
+前端要能看到任务进度
+工具调用前要做确认
+</code></pre>
+<p>这个视频创作 Agent 现在已经具备了服务化的基本形态：前端可以创建任务，后端可以异步执行，LangGraph 可以按状态分支，线程状态可以持久化，用户也能在同一个 <code>thread_id</code> 里持续修改和确认视频方案。</p>
+<p>接下来要继续补的是更完整的分布式任务队列、数据库 checkpointer，以及真正的 token 级流式输出。等这几块补齐后，它就不只是一个本地 Agent，而是一个可以承载多用户请求的视频创作 Agent 服务。</p>
         </div>
     </article>
     <div id="footer-placeholder"></div>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+        mermaid.initialize({ startOnLoad: true, theme: "default", securityLevel: "loose" });
+    </script>
     <script src="../components/load-components.js"></script>
-
-<script src="https://pgh11.github.io/pgh-blog/script.js"></script>
+    <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
 </body>
 </html>
