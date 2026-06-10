@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI MV Agent 架构介绍与技术实现 | PGH Blog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://pgh11.github.io/pgh-blog/styles.css">
+    <style>
+        .post-header { padding: 160px 24px 60px; background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), var(--bg-primary); }
+        .post-container { max-width: 880px; margin: 0 auto; }
+        .post-title { font-size: 42px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; }
+        .post-meta { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .post-category { padding: 6px 16px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .post-date { color: var(--text-tertiary); font-size: 15px; }
+        .post-summary { color: var(--text-secondary); font-size: 18px; line-height: 1.8; max-width: 780px; }
+        .post-content { padding: 40px 24px 80px; }
+        .post-content h1 { font-size: 34px; font-weight: 700; margin: 24px 0 24px; color: var(--text-primary); }
+        .post-content h2 { font-size: 28px; font-weight: 600; margin: 42px 0 20px; color: var(--text-primary); }
+        .post-content h3 { font-size: 22px; font-weight: 600; margin: 34px 0 16px; color: var(--text-primary); }
+        .post-content h4 { font-size: 18px; font-weight: 600; margin: 28px 0 14px; color: var(--text-primary); }
+        .post-content p { color: var(--text-secondary); line-height: 1.85; margin-bottom: 20px; font-size: 17px; }
+        .post-content ul, .post-content ol { color: var(--text-secondary); line-height: 1.8; margin-bottom: 22px; padding-left: 24px; }
+        .post-content li { margin-bottom: 10px; font-size: 17px; }
+        .post-content a { color: #3b82f6; text-decoration: none; }
+        .post-content a:hover { text-decoration: underline; }
+        .post-content code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #3b82f6; }
+        .post-content pre { background: var(--bg-secondary); padding: 20px; border-radius: 12px; overflow-x: auto; margin-bottom: 24px; border: 1px solid var(--border-color); }
+        .post-content pre code { background: none; padding: 0; color: var(--text-primary); font-size: 14px; line-height: 1.8; }
+        .post-content .mermaid { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin: 28px 0; overflow-x: auto; text-align: center; }
+        .post-content .mermaid svg { max-width: 100%; height: auto; }
+        .post-content blockquote { border-left: 4px solid #3b82f6; padding-left: 20px; margin: 24px 0; color: var(--text-tertiary); font-style: italic; }
+        .post-content figure { margin: 32px 0; }
+        .post-content img { width: 100%; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-secondary); }
+        .table-wrap { overflow-x: auto; margin: 28px 0; border: 1px solid var(--border-color); border-radius: 12px; }
+        .post-content table { width: 100%; border-collapse: collapse; min-width: 640px; }
+        .post-content th, .post-content td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary); vertical-align: top; }
+        .post-content th { color: var(--text-primary); background: var(--bg-secondary); font-weight: 600; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #3b82f6; text-decoration: none; font-weight: 500; margin-bottom: 32px; transition: transform 0.3s ease; }
+        .back-btn:hover { transform: translateX(-4px); }
+        @media (max-width: 768px) { .post-title { font-size: 32px; } .post-container { max-width: 100%; } }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" id="themeToggle">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+    </div>
+    <div id="navbar-placeholder"></div>
+    <section class="post-header">
+        <div class="post-container">
+            <a href="https://pgh11.github.io/pgh-blog/blog.html" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>返回博客列表</a>
+            <h1 class="post-title">AI MV Agent 架构介绍与技术实现</h1>
+            <div class="post-meta"><span class="post-category">AI Agent</span><span class="post-date">2026年6月10日</span></div>
+            <p class="post-summary">介绍一套面向音乐 MV 生成的 Agent 架构，梳理 FastAPI、LangGraph、SQLite、阶段守卫、专家节点与前端 JSON 卡片之间的技术实现。</p>
+        </div>
+    </section>
+    <article class="post-content">
+        <div class="post-container">
+            <h1>Agent 架构介绍与技术实现</h1>
+<p>本文介绍一套 Agent 的架构设计。它不是一个简单的聊天机器人，而是一个面向“音乐 MV 生成”的业务编排系统：用户用自然语言表达需求，Agent 需要把需求拆成稳定的业务动作，按阶段推进音乐、MV 大纲、详情脚本、资产提示词、分镜、分段视频和最终合成，并把每一步产物输出成前端可以直接渲染的 JSON 卡片。</p>
+<p>这套系统最核心的挑战不是“让模型会写内容”，而是让模型在复杂业务流里保持可控：</p>
+<ul>
+<li>不能跳阶段：音乐没准备好，不能直接生成分镜。</li>
+<li>不能乱改 schema：前端卡片依赖固定字段，模型不能多写解释文本或少字段。</li>
+<li>不能误触发付费任务：生成音乐、生成视频这类动作必须有确认边界。</li>
+<li>不能丢上下文：每轮聊天都要知道当前阶段和上游产物。</li>
+<li>不能把路由和内容混在一起：判断“用户想做什么”和生成“当前阶段业务 JSON”必须分离。</li>
+</ul>
+<p>当前实现用 FastAPI + LangChain + LangGraph + SQLite + Skill Prompt 的组合，把业务拆成几层：API 层、会话层、路由层、阶段节点层、专家生成层、响应打包层和异步任务回写层。</p>
+<h2>1. 总体架构</h2>
+<p>从一次聊天请求看，主链路是：</p>
+<pre><code class="language-text">用户输入
+  -&gt; FastAPI /business/chat
+  -&gt; 恢复 session context 和 artifacts
+  -&gt; LangGraph business_step
+  -&gt; route_user_intent 判断 action
+  -&gt; template_retriever 按标签召回模板包
+  -&gt; stage_guard 检查阶段和前置产物
+  -&gt; ACTION_NODE_MAP 找到业务节点
+  -&gt; NODE_REGISTRY 执行专家节点或工具节点
+  -&gt; validate_stage_output 校验 JSON
+  -&gt; package_response 打包 text + card
+  -&gt; SQLite 保存 turn 和 artifact
+  -&gt; 返回前端 data.interaction_text + data.form_data
+</code></pre>
+<p>对应到代码，关键模块如下：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>模块</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>business_agent/api.py</code></td>
+<td>FastAPI 入口。负责上下文恢复、请求归一、Graph 调用、流式事件、异步 task-event 回写。</td>
+</tr>
+<tr>
+<td><code>business_agent/graph/builder.py</code></td>
+<td>构建 LangGraph 主图，目前是短链路：<code>START -&gt; business_step -&gt; package -&gt; END</code>。</td>
+</tr>
+<tr>
+<td><code>business_agent/graph/nodes.py</code></td>
+<td>连接路由层和阶段执行层。先 route，再按需执行显式阶段节点。</td>
+</tr>
+<tr>
+<td><code>plugins/music_mv_workflow/router.py</code></td>
+<td>意图识别和业务路由。只判断 action、目标阶段、影响范围，不生成业务卡片内容。</td>
+</tr>
+<tr>
+<td><code>business_agent/stage_flow.py</code></td>
+<td>工作流事实表。定义阶段、运行态、失败态、继续流转、action 到 node 的映射、task-event 映射。</td>
+</tr>
+<tr>
+<td><code>business_agent/stage_guard.py</code></td>
+<td>阶段守卫。防止跳过前置阶段或缺少上游 artifact 时执行下游节点。</td>
+</tr>
+<tr>
+<td><code>business_agent/stage_nodes.py</code></td>
+<td>阶段节点注册表。定义每个 node 的 stage_id、schema、skill、工具函数。</td>
+</tr>
+<tr>
+<td><code>business_agent/expert_runner.py</code></td>
+<td>调用阶段专家 LLM，并保护 JSON 输出契约。</td>
+</tr>
+<tr>
+<td><code>business_agent/template_retriever.py</code></td>
+<td>模板检索层。把用户输入分发成标签，并按标签召回大纲、视觉、资产、分镜等模板包。</td>
+</tr>
+<tr>
+<td><code>business_agent/response_packager.py</code></td>
+<td>把内部 graph state 转成前端聊天模块可消费的响应。</td>
+</tr>
+<tr>
+<td><code>business_agent/session_store.py</code></td>
+<td>SQLite 记忆层。保存 session、messages、artifacts。</td>
+</tr>
+<tr>
+<td><code>skills/&lt;mv-skills&gt;/</code></td>
+<td>各阶段专家提示词和 few-shot 示例。</td>
+</tr>
+</tbody>
+</table></div>
+<p>这个设计的重点是把“决策”和“生成”拆开。</p>
+<p>router 只回答一个问题：用户当前想做什么？</p>
+<p>stage node 只回答一个问题：当前 action 对应的业务产物 JSON 应该是什么？</p>
+<p>response packager 只回答一个问题：这些内部状态如何变成前端响应？</p>
+<p>三者不互相抢职责，整个 Agent 才能在多轮、多阶段、异步任务里保持稳定。</p>
+<h2>2. 为什么 LangGraph 主图很短</h2>
+<p>很多 Agent 会把所有业务节点都画进 LangGraph：router、outline、details、asset、storyboard、tools，每个节点之间再写条件边。当前项目没有这么做，而是把外层图压到非常短：</p>
+<pre><code class="language-text">START -&gt; business_step -&gt; package -&gt; END
+</code></pre>
+<p>原因是 MV 工作流虽然阶段多，但真正的分发规则主要是业务状态机，不是图结构本身。把所有阶段都放进 LangGraph 条件边，会让条件边和业务规则散落在多个地方。当前实现把复杂度集中在三个表：</p>
+<ul>
+<li><code>STAGES</code>：阶段事实表。</li>
+<li><code>ACTION_NODE_MAP</code>：路由 action 到执行 node 的映射。</li>
+<li><code>NODE_REGISTRY</code>：node 到 schema、skill、工具函数的映射。</li>
+</ul>
+<p>因此 LangGraph 只负责一次稳定的执行骨架：</p>
+<pre><code class="language-python">routed_state = route_intent_node(state)
+if not routed_state[&quot;node_name&quot;]:
+    return routed_state
+return explicit_stage_node(node_name)(routed_state)
+</code></pre>
+<p>这种做法的好处是：</p>
+<ul>
+<li>新增阶段时优先改注册表，而不是改图结构。</li>
+<li>route-only 动作可以自然停在打包层，不会进入专家节点。</li>
+<li>阶段守卫统一生效，避免某条条件边绕过校验。</li>
+<li>调试时可以直接看 <code>route.action -&gt; node_name -&gt; expert_output</code>。</li>
+</ul>
+<h2>3. 状态机设计</h2>
+<p>MV 生成业务的本质是一条线性流水线，中间穿插异步运行态和失败态。</p>
+<p>主要阶段如下：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>stage_id</th>
+<th>阶段名</th>
+<th>产物</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>music_source_selecting</code></td>
+<td>选择 AI 生成音乐或上传音乐</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>music_params_confirming</code></td>
+<td><code>music_config</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>music_generating</code></td>
+<td><code>music_result</code> running</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>music_ready</code></td>
+<td><code>music_result</code> succeeded</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>music_failed</code></td>
+<td><code>music_result</code> failed</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>outline_generating</code></td>
+<td><code>outline_config</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>outline_ready</code></td>
+<td><code>outline</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>details_ready</code></td>
+<td><code>details</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>asset_prompts_ready</code></td>
+<td><code>asset_prompts</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>asset_generating</code></td>
+<td><code>assets</code> running</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>asset_ready</code></td>
+<td><code>assets</code> succeeded</td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>storyboard_ready</code></td>
+<td><code>storyboard</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>segment_video_generating</code></td>
+<td><code>segment_videos</code> running</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>segment_video_ready</code></td>
+<td><code>segment_videos</code> succeeded</td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>final_video_generating</code></td>
+<td><code>final_video</code> running</td>
+</tr>
+<tr>
+<td>18</td>
+<td><code>final_video_ready</code></td>
+<td><code>final_video</code> succeeded</td>
+</tr>
+<tr>
+<td>19</td>
+<td><code>final_video_failed</code></td>
+<td><code>final_video</code> failed</td>
+</tr>
+<tr>
+<td>20</td>
+<td><code>asset_failed</code></td>
+<td><code>assets</code> failed</td>
+</tr>
+<tr>
+<td>21</td>
+<td><code>segment_video_failed</code></td>
+<td><code>segment_videos</code> failed</td>
+</tr>
+</tbody>
+</table></div>
+<p>正常推进链路是：</p>
+<pre><code class="language-text">0 选择音乐来源
+  -&gt; 1 音乐参数确认
+  -&gt; 2 音乐生成中
+  -&gt; 3 音乐已就绪
+  -&gt; 5 大纲配置
+  -&gt; 6 大纲完成
+  -&gt; 8 详情完成
+  -&gt; 10 资产提示词完成
+  -&gt; 11 资产生成中
+  -&gt; 12 资产完成
+  -&gt; 14 分镜完成
+  -&gt; 15 分段视频生成中
+  -&gt; 16 分段视频完成
+  -&gt; 17 最终视频合成中
+  -&gt; 18 成片完成
+</code></pre>
+<p>运行中阶段是 <code>2、11、15、17</code>。这些阶段只允许查状态或等待，不能重复提交任务，也不能推进到下游。</p>
+<p>失败阶段是 <code>4、19、20、21</code>。失败阶段允许 retry，但 retry 也不是盲目重跑。比如音乐重试属于付费/耗时动作，会先走确认守卫；资产图片由业务后端控制，Agent 只等待 task-event 回写。</p>
+<h2>4. 路由层：把自然语言变成业务 action</h2>
+<p><code>route_user_intent</code> 是整个 Agent 的第一道业务闸门。它接收：</p>
+<ul>
+<li><code>current_stage_id</code></li>
+<li>用户最新输入</li>
+<li>session context</li>
+<li>已有 artifacts</li>
+<li>最近消息</li>
+<li>project_id</li>
+</ul>
+<p>然后输出一个 route 对象，例如：</p>
+<pre><code class="language-json">{
+  &quot;accepted&quot;: true,
+  &quot;reason&quot;: &quot;accepted&quot;,
+  &quot;from_stage_id&quot;: 6,
+  &quot;to_stage_id&quot;: 8,
+  &quot;action&quot;: &quot;generate_details&quot;,
+  &quot;available_actions&quot;: [&quot;generate_details&quot;, &quot;revise_outline&quot;],
+  &quot;invalidates&quot;: [],
+  &quot;preserved_as_reference&quot;: []
+}
+</code></pre>
+<p>route 只用于调度，不是前端卡片。它不能混进专家产物里。</p>
+<p>路由判断的整体流程可以画成下面这样：</p>
+<div class="mermaid">
+flowchart TD
+    A["用户最新输入"] --> B["API 恢复上下文<br/>current_stage_id<br/>recent_messages<br/>artifacts"]
+    B --> C["route_user_intent"]
+
+    C --> D["resolve_intent<br/>规则优先 + 轻量 AI 分类兜底"]
+    D --> E{"是否离题或能力咨询?"}
+    E -- "离题" --> E1["redirect_to_mv_workflow<br/>route-only"]
+    E -- "能力咨询" --> E2["introduce_agent<br/>route-only"]
+    E -- "否" --> F{"当前是否运行中阶段?<br/>2 / 11 / 15 / 17"}
+
+    F -- "是，且不是查状态" --> F1["wait_for_running_stage<br/>route-only"]
+    F -- "是，查状态" --> F2["get_music_progress / get_asset_progress<br/>或 read_project_status"]
+    F -- "否" --> G{"用户意图类型"}
+
+    G -- "选择/上传/生成音乐" --> H["音乐来源与音乐配置路由<br/>select_music_source<br/>request_music_upload<br/>show_music_config"]
+    G -- "继续/确认" --> I["CONTINUE_TRANSITIONS<br/>按当前 stage 推进相邻下一步"]
+    G -- "修改/重生成 artifact" --> J["target 归一化<br/>TARGET_TO_EDIT_STAGE"]
+    G -- "重试失败任务" --> K["FAILED_STAGES retry map"]
+    G -- "下载/状态/取消" --> L["停留当前阶段的 route-only action"]
+    G -- "不明确" --> M["ask_clarifying_question"]
+
+    J --> N{"目标阶段是否已到达?"}
+    N -- "否" --> N1["ask_continue_in_order"]
+    N -- "是" --> O{"是否影响已有下游 artifact?"}
+    O -- "是" --> O1["confirm_dependency_impact<br/>提示 invalidates"]
+    O -- "否" --> P["生成 revise_* 或 retry_* action"]
+
+    H --> Q["candidate route"]
+    I --> Q
+    K --> Q
+    L --> Q
+    M --> Q
+    P --> Q
+    F2 --> Q
+
+    Q --> R{"是否付费/耗时动作?<br/>generate_music / retry_music_generation"}
+    R -- "是，低置信度或参数不完整" --> R1["confirm_paid_generation<br/>保存 pending_paid_confirmation"]
+    R -- "否或已确认" --> S["输出 route<br/>accepted / action / to_stage_id<br/>available_actions / invalidates"]
+
+    E1 --> T["package_response"]
+    E2 --> T
+    F1 --> T
+    N1 --> T
+    O1 --> T
+    R1 --> T
+    S --> U["node_name_for_route<br/>ACTION_NODE_MAP 查 node"]
+</div>
+
+<p>这张图里最重要的是：router 输出的是“候选调度结果”，不是最终执行许可。真正能不能跑节点，还要继续过 <code>ACTION_NODE_MAP</code> 和 <code>stage_guard</code>。</p>
+<p>路由层有几个重要策略。</p>
+<p>第一，规则优先。常见动作通过关键词和当前阶段直接判断，比如“继续”“下一步”“进度”“重试”“上传音乐”“换歌”“修改大纲”。规则可以覆盖高确定性的输入，减少模型误判。</p>
+<p>第二，运行态拦截。如果当前阶段是运行中，而用户不是问进度，就返回：</p>
+<pre><code class="language-json">{
+  &quot;accepted&quot;: false,
+  &quot;reason&quot;: &quot;stage_is_running&quot;,
+  &quot;action&quot;: &quot;wait_for_running_stage&quot;
+}
+</code></pre>
+<p>这样可以避免用户在音乐生成中又发一句“继续”，导致系统重复提交生成任务。</p>
+<p>第三，编辑目标归一化。用户可能说“换歌”“改简介”“调整人物设定”“图片重来”“成片重新生成”。router 会把这些口语化目标映射成标准 target：</p>
+<pre><code class="language-text">换歌 -&gt; music_source/music
+简介/大纲/人物设定 -&gt; outline
+详情/脚本/场景描述 -&gt; details
+角色/场景/物品/图片 -&gt; assets
+分镜/故事板 -&gt; storyboard
+成片/最终视频 -&gt; final_video
+</code></pre>
+<p>第四，下游影响提示。修改上游 artifact 时，router 不会直接覆盖下游产物，而是计算 <code>DOWNSTREAM_INVALIDATION</code>。如果下游已经有产物，会先返回 <code>confirm_dependency_impact</code>，让用户知道这次修改会影响哪些内容。</p>
+<p>例如修改 outline，可能影响：</p>
+<pre><code class="language-text">details -&gt; assets -&gt; storyboard -&gt; segment_videos -&gt; final_video
+</code></pre>
+<p>这个设计解决了一个很常见的问题：用户只是想把简介改得更燃一点，但如果系统直接重跑，会让后续详情、资产、分镜和视频都处于不一致状态。影响确认机制把“上游修改会带来什么后果”显式化。</p>
+<h2>5. action 到 node 的映射</h2>
+<p>router 输出的是 action，真正执行的是 node。</p>
+<p>中间通过 <code>ACTION_NODE_MAP</code> 连接：</p>
+<pre><code class="language-text">show_music_config       -&gt; music_config_node
+generate_outline        -&gt; outline_form_node
+generate_outline_result -&gt; outline_generate_node
+revise_outline          -&gt; outline_revision_node
+generate_details        -&gt; details_generate_node
+revise_details          -&gt; details_revision_node
+generate_assets         -&gt; asset_prompt_node
+revise_assets           -&gt; asset_prompt_revision_node
+generate_storyboard     -&gt; storyboard_generate_node
+revise_storyboard       -&gt; storyboard_revision_node
+generate_segment_videos -&gt; segment_video_tool_node
+generate_final_video    -&gt; final_compose_tool_node
+</code></pre>
+<p>没有出现在 <code>ACTION_NODE_MAP</code> 里的 action 都是 route-only。比如：</p>
+<ul>
+<li><code>select_music_source</code></li>
+<li><code>request_music_upload</code></li>
+<li><code>collect_music_brief</code></li>
+<li><code>introduce_agent</code></li>
+<li><code>wait_for_running_stage</code></li>
+<li><code>confirm_paid_generation</code></li>
+<li><code>confirm_dependency_impact</code></li>
+<li><code>show_current_card</code></li>
+<li><code>read_project_status</code></li>
+</ul>
+<p>route-only 不生成新的业务 artifact，只返回文本、选择卡、确认卡，或者展示已有卡片。</p>
+<p>这个边界非常重要：并不是每次用户说话都要调用专家模型。很多回合只是确认、等待、澄清、展示状态。少调用专家，既省成本，也减少随机性。</p>
+<p>把 action、node、注册表和响应打包放到一起看，节点架构是下面这张图：</p>
+<div class="mermaid">
+flowchart LR
+    subgraph Input["输入与状态"]
+        A["ChatRequest<br/>message / session_id / current_stage_id"]
+        B["SessionStore.load_context<br/>sessions / messages / artifacts"]
+        C["BusinessAgentState"]
+    end
+
+    subgraph Routing["路由层"]
+        D["route_intent_node"]
+        E["route_user_intent"]
+        F["route<br/>action / accepted / to_stage_id"]
+    end
+
+    subgraph Dispatch["调度与守卫"]
+        G["node_name_for_route"]
+        H["ACTION_NODE_MAP<br/>action -> node_name"]
+        I["guard_stage_order"]
+        J{"allowed?"}
+    end
+
+    subgraph Registry["节点注册表"]
+        K["NODE_REGISTRY[node_name]"]
+        L["StageNodeSpec<br/>stage_id<br/>schema_keys<br/>skill_name<br/>output_factory<br/>is_tool_node"]
+    end
+
+    subgraph Execute["节点执行"]
+        M{"是否有 output_factory?"}
+        N["确定性/工具节点<br/>outline_form<br/>progress_tool<br/>segment_video_tool<br/>final_compose_tool"]
+        O["专家节点 run_expert<br/>加载当前 SKILL.md<br/>加载 few-shot<br/>调用 LLM"]
+        P["revision 节点<br/>读取旧 artifact<br/>完整重写 JSON<br/>judge 校验修改是否命中"]
+    end
+
+    subgraph Contract["JSON 契约保护"]
+        Q["parse_json_object"]
+        R["sanitize_expert_output<br/>移除 route 元数据"]
+        S["validate_stage_output<br/>stage_id 匹配<br/>schema_keys 完全匹配<br/>language 枚举校验"]
+    end
+
+    subgraph Output["响应与持久化"]
+        T["expert_output"]
+        U["package_response<br/>text + card"]
+        V["save_turn / upsert_artifact"]
+        W["Public API Response<br/>data.interaction_text<br/>data.form_data"]
+    end
+
+    A --> B --> C --> D --> E --> F
+    F --> G --> H --> I --> J
+    J -- "否" --> U
+    J -- "是" --> K --> L --> M
+    M -- "是" --> N --> S
+    M -- "否，普通专家" --> O --> Q --> R --> S
+    M -- "否，修改已有产物" --> P --> S
+    S --> T --> U --> V --> W
+</div>
+
+<p>这张图可以从左到右读：输入先变成带上下文的 state；router 只产出 action；<code>ACTION_NODE_MAP</code> 找执行节点；<code>NODE_REGISTRY</code> 决定节点契约；节点执行后统一进入 JSON 契约保护；最后才打包成前端响应并写回 artifact。</p>
+<h2>6. 阶段守卫：router 不能被完全信任</h2>
+<p>即使 router 判断用户想生成 storyboard，也不能直接执行 <code>storyboard_generate_node</code>。因为用户可能在音乐刚完成时说“直接给我分镜”。意图是清楚的，但业务状态不允许。</p>
+<p>所以进入节点前必须过 <code>guard_stage_order</code>。</p>
+<p>每个 node 都声明前置条件：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>node</th>
+<th>最早阶段</th>
+<th>必需 artifact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>music_config_node</code></td>
+<td>0</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>outline_form_node</code></td>
+<td>3</td>
+<td><code>music_result</code></td>
+</tr>
+<tr>
+<td><code>outline_generate_node</code></td>
+<td>5</td>
+<td><code>outline_config</code></td>
+</tr>
+<tr>
+<td><code>outline_revision_node</code></td>
+<td>6</td>
+<td><code>outline</code></td>
+</tr>
+<tr>
+<td><code>details_generate_node</code></td>
+<td>6</td>
+<td><code>outline</code></td>
+</tr>
+<tr>
+<td><code>details_revision_node</code></td>
+<td>8</td>
+<td><code>details</code></td>
+</tr>
+<tr>
+<td><code>asset_prompt_node</code></td>
+<td>8</td>
+<td><code>details</code></td>
+</tr>
+<tr>
+<td><code>asset_prompt_revision_node</code></td>
+<td>10</td>
+<td><code>asset_prompts</code></td>
+</tr>
+<tr>
+<td><code>storyboard_generate_node</code></td>
+<td>12</td>
+<td><code>assets</code></td>
+</tr>
+<tr>
+<td><code>storyboard_revision_node</code></td>
+<td>14</td>
+<td><code>storyboard</code></td>
+</tr>
+<tr>
+<td><code>segment_video_tool_node</code></td>
+<td>14</td>
+<td><code>storyboard</code></td>
+</tr>
+<tr>
+<td><code>final_compose_tool_node</code></td>
+<td>16</td>
+<td><code>segment_videos</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>守卫检查两件事：</p>
+<ol>
+<li>当前 <code>current_stage_id</code> 是否已经到达最早阶段。</li>
+<li>context 或 artifacts 中是否存在必需上游产物。</li>
+</ol>
+<p>如果不满足，就把 route 改成：</p>
+<pre><code class="language-json">{
+  &quot;accepted&quot;: false,
+  &quot;reason&quot;: &quot;missing_prerequisite&quot;,
+  &quot;action&quot;: &quot;ask_continue_in_order&quot;
+}
+</code></pre>
+<p>这样即使路由层误判，执行层也不会跳阶段。</p>
+<h2>7. 阶段节点注册表：JSON 契约的唯一事实来源</h2>
+<p><code>NODE_REGISTRY</code> 是控制 JSON 输出最关键的结构。每个节点都是一个 <code>StageNodeSpec</code>：</p>
+<pre><code class="language-python">StageNodeSpec(
+    name=&quot;outline_generate_node&quot;,
+    stage_id=6,
+    schema_keys=frozenset({
+        &quot;stage_id&quot;,
+        &quot;title&quot;,
+        &quot;audioUrl&quot;,
+        &quot;musicDuration&quot;,
+        &quot;aspectRatio&quot;,
+        &quot;language&quot;,
+        &quot;style&quot;,
+        &quot;introduction&quot;,
+        &quot;characterSettings&quot;,
+    }),
+    skill_name=&quot;mv-outline-skill&quot;,
+)
+</code></pre>
+<p>它同时定义四件事：</p>
+<ul>
+<li>这个节点输出哪个 <code>stage_id</code>。</li>
+<li>顶层 JSON 字段必须有哪些。</li>
+<li>是否需要加载某个 skill 调用 LLM。</li>
+<li>是否有 <code>output_factory</code>，也就是是否可以确定性生成或调用工具。</li>
+</ul>
+<p>当前节点分三类。</p>
+<p>第一类是专家节点。没有 <code>output_factory</code>，会调用 <code>run_expert</code>，例如大纲、详情、资产提示词、分镜生成。</p>
+<p>第二类是确定性节点。有 <code>output_factory</code>，但不一定调用外部工具，例如 <code>outline_form_node</code> 直接从 context 组装：</p>
+<pre><code class="language-json">{
+  &quot;stage_id&quot;: 5,
+  &quot;language&quot;: &quot;en&quot;,
+  &quot;aspectRatio&quot;: &quot;9:16&quot;,
+  &quot;style&quot;: &quot;real_person&quot;
+}
+</code></pre>
+<p>第三类是工具节点。有 <code>output_factory</code> 且 <code>is_tool_node=True</code>，例如查询音乐进度、查询资产进度、分段视频任务占位、最终合成任务占位。</p>
+<p>所有节点无论来自 LLM 还是代码生成，都必须经过同一个校验函数：</p>
+<pre><code class="language-python">validate_stage_output(node_name, output)
+</code></pre>
+<p>校验规则很硬：</p>
+<ul>
+<li><code>output["stage_id"]</code> 必须等于 node 声明的 <code>stage_id</code>。</li>
+<li><code>set(output.keys())</code> 必须和 <code>schema_keys</code> 完全一致。</li>
+<li>不能少字段。</li>
+<li>不能多字段。</li>
+<li>如果包含 <code>language</code>，必须在支持范围内。</li>
+<li>音乐配置节点还会做参数归一化。</li>
+</ul>
+<p>这里故意采用“完全匹配”，而不是“至少包含”。原因是前端卡片、session artifact、后续节点都依赖稳定 schema。模型多输出一个 <code>route</code>、<code>message</code>、<code>explanation</code> 或 <code>metadata</code>，看似无害，实际会污染状态库，后续节点可能误读。</p>
+<h2>8. 如何控制 LLM 只输出 JSON</h2>
+<p>本系统对 JSON 输出用了多层防线。</p>
+<h3>8.1 Prompt 层：明确专家只是第二阶段生成器</h3>
+<p><code>run_expert</code> 的 system prompt 会明确告诉模型：</p>
+<ul>
+<li>route AI 已经选好了 action。</li>
+<li>你不能重新解释用户意图。</li>
+<li>你不能选择别的节点。</li>
+<li>你不能推进到其他阶段。</li>
+<li>你只能输出当前业务节点的纯 JSON。</li>
+<li>不允许 Markdown、解释、代码块、自然语言回复。</li>
+<li>不允许输出 route、action、messages、canvas_events 等内部字段。</li>
+<li>顶层字段必须严格等于 <code>expected_schema_keys</code>。</li>
+</ul>
+<p>这其实是在限制模型的“自由度”。模型越想帮忙，越容易把调度信息、解释文本、下一步建议混进输出。这里要反过来告诉它：你的工作不是聊天，也不是调度，只是填当前卡片。</p>
+<h3>8.2 HumanMessage 层：把契约、skill、few-shot、route、context 分区</h3>
+<p>给模型的用户消息不是简单塞一段需求，而是分区：</p>
+<pre><code class="language-text">Node output contract:
+- expected_stage_id
+- expected_top_level_keys
+- forbidden_top_level_keys
+- output_type: one JSON object only
+
+Current skill:
+&lt;当前阶段 SKILL.md&gt;
+
+Few-shot examples:
+&lt;positive/negative examples&gt;
+
+Route result:
+&lt;仅供调度参考，不可输出&gt;
+
+Project context:
+&lt;上游产物和会话上下文&gt;
+
+Latest user input:
+&lt;用户最新输入&gt;
+</code></pre>
+<p>这种格式的好处是模型知道哪些是约束、哪些是参考、哪些是内容输入。</p>
+<h3>8.3 解析层：只接受 JSON object</h3>
+<p>模型输出后会进入 <code>parse_json_object</code>。</p>
+<p>它兼容一种情况：模型把 JSON 包在代码块里。系统会尝试提取代码块里的 <code>{...}</code>。但最终必须能被 <code>json.loads</code> 解析成 dict。</p>
+<p>如果不是合法 JSON，直接抛错。</p>
+<h3>8.4 清洗层：删除 route 元数据</h3>
+<p>即使 prompt 已禁止，系统仍会清洗这些字段：</p>
+<pre><code class="language-text">action
+available_actions
+from_stage_id
+from_stage_name
+to_stage_id
+to_stage_name
+invalidates
+preserved_as_reference
+accepted
+reason
+</code></pre>
+<p>清洗后还会校验 <code>stage_id</code> 是否匹配当前 route 预期阶段。</p>
+<h3>8.5 Schema 层：顶层字段完全匹配</h3>
+<p>最后用 <code>validate_stage_output</code> 做强校验：</p>
+<pre><code class="language-python">keys = set(output)
+if keys != spec.schema_keys:
+    raise ValueError(...)
+</code></pre>
+<p>这一步是最硬的兜底。Prompt 让模型尽量守规矩，代码校验保证不守规矩的输出不会进入系统。</p>
+<h2>9. 修改已有产物：不是 patch，而是完整重写 + 校验</h2>
+<p>用户经常会说：</p>
+<ul>
+<li>“把简介改得更燃一点。”</li>
+<li>“女主换成银色短发。”</li>
+<li>“分镜里多一点雨夜氛围。”</li>
+<li>“资产提示词保持风格，但角色更年轻。”</li>
+</ul>
+<p>这类修改不能简单重跑生成节点。因为重跑可能把用户不想改的字段也洗掉。也不能只让模型输出 patch，因为字段级 patch 对复杂嵌套 JSON 很脆弱，容易漏改、路径错、类型错。</p>
+<p>当前策略是：读取旧 artifact，让模型基于旧卡片输出完整新卡片。</p>
+<p>流程是：</p>
+<pre><code class="language-text">用户修改请求
+  -&gt; router 识别 edit_artifact + target
+  -&gt; action 映射到 *_revision_node
+  -&gt; stage_guard 确认旧 artifact 存在
+  -&gt; _rewrite_stage_output
+  -&gt; 模型输出完整新 JSON
+  -&gt; validate_stage_output 完整 schema 校验
+  -&gt; _revision_satisfies_user_request 用小 judge 判断是否满足修改
+  -&gt; 不满足则重试一次
+  -&gt; 满足后覆盖写回 artifact
+</code></pre>
+<p><code>_rewrite_stage_output</code> 的 prompt 强调：</p>
+<ul>
+<li>使用 previous card 作为基础。</li>
+<li>用户要求必须被明确体现。</li>
+<li>输出一个完整 JSON 对象。</li>
+<li>顶层 key 必须完全等于当前 node schema。</li>
+<li>不要输出 wrapper、route、Markdown 或解释。</li>
+</ul>
+<p>然后 <code>_revision_satisfies_user_request</code> 再调用一次小模型判断：</p>
+<pre><code class="language-json">{
+  &quot;satisfied&quot;: true,
+  &quot;reason&quot;: &quot;...&quot;
+}
+</code></pre>
+<p>如果旧输出和新输出完全相同，直接判定失败。第一次不满足会重试一次；第二次仍不满足，就抛错，不写库。</p>
+<p>这个设计在稳定性上比较均衡：</p>
+<ul>
+<li>比字段 patch 更适合复杂 JSON。</li>
+<li>比完全重生更能保留上下文。</li>
+<li>通过 schema 校验保证前端仍能渲染。</li>
+<li>通过 judge 防止模型“看起来输出了 JSON，但没有真的改到用户要改的点”。</li>
+</ul>
+<h2>10. 付费/耗时任务的二次确认</h2>
+<p>生成音乐、重试音乐这类动作可能触发外部付费或耗时任务。系统不能因为一句模糊的“继续”就直接发起。</p>
+<p>router 里有一层确认守卫：</p>
+<pre><code class="language-text">PAID_GENERATION_ACTIONS = {
+  &quot;generate_music&quot;,
+  &quot;retry_music_generation&quot;
+}
+</code></pre>
+<p>当 action 命中这些动作时，会检查两件事：</p>
+<ul>
+<li>意图置信度是否足够高。</li>
+<li>所需参数是否完整。</li>
+</ul>
+<p>如果不满足，就返回：</p>
+<pre><code class="language-json">{
+  &quot;accepted&quot;: false,
+  &quot;reason&quot;: &quot;needs_paid_generation_confirmation&quot;,
+  &quot;action&quot;: &quot;confirm_paid_generation&quot;,
+  &quot;paid_confirmation&quot;: {
+    &quot;stage_id&quot;: 1,
+    &quot;target&quot;: &quot;music&quot;,
+    &quot;pending_action&quot;: &quot;generate_music&quot;,
+    &quot;parameters&quot;: {
+      &quot;project_id&quot;: &quot;...&quot;,
+      &quot;music_description&quot;: &quot;...&quot;,
+      &quot;voice_selection&quot;: &quot;...&quot;,
+      &quot;music_type&quot;: &quot;...&quot;
+    }
+  }
+}
+</code></pre>
+<p><code>response_packager</code> 会把它打包成确认卡，并让 <code>ok=false</code>。同时 <code>session_store</code> 会把 <code>pending_paid_confirmation</code> 保存成 artifact。用户下一轮确认后，router 再从 session context 取回 pending action，恢复真实动作。</p>
+<p>这里有一个细节：确认时会检查 pending 的 <code>stage_id</code> 是否仍等于当前 stage，防止用户跨阶段后又触发过期任务。</p>
+<h2>11. 异步任务：Agent 不直接等外部生成完成</h2>
+<p>音乐、资产图片、分段视频、最终合成都可能是异步任务。Agent 不应该在聊天请求里阻塞等待，也不应该凭空编造完成状态。</p>
+<p>当前系统用 <code>POST /business/task-event</code> 回写任务结果。</p>
+<p>典型事件映射：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>event_type</th>
+<th>写入 stage_id</th>
+<th>artifact_key</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>music_started</code></td>
+<td>2</td>
+<td><code>music_result</code></td>
+<td>running</td>
+</tr>
+<tr>
+<td><code>music_uploaded</code></td>
+<td>3</td>
+<td><code>music_result</code></td>
+<td>succeeded</td>
+</tr>
+<tr>
+<td><code>music_completed</code></td>
+<td>3</td>
+<td><code>music_result</code></td>
+<td>succeeded</td>
+</tr>
+<tr>
+<td><code>music_failed</code></td>
+<td>4</td>
+<td><code>music_result</code></td>
+<td>failed</td>
+</tr>
+<tr>
+<td><code>assets_started</code></td>
+<td>11</td>
+<td><code>assets</code></td>
+<td>running</td>
+</tr>
+<tr>
+<td><code>assets_completed</code></td>
+<td>12</td>
+<td><code>assets</code></td>
+<td>succeeded</td>
+</tr>
+<tr>
+<td><code>assets_failed</code></td>
+<td>20</td>
+<td><code>assets</code></td>
+<td>failed</td>
+</tr>
+<tr>
+<td><code>segment_videos_started</code></td>
+<td>15</td>
+<td><code>segment_videos</code></td>
+<td>running</td>
+</tr>
+<tr>
+<td><code>segment_videos_completed</code></td>
+<td>16</td>
+<td><code>segment_videos</code></td>
+<td>succeeded</td>
+</tr>
+<tr>
+<td><code>segment_videos_failed</code></td>
+<td>21</td>
+<td><code>segment_videos</code></td>
+<td>failed</td>
+</tr>
+<tr>
+<td><code>final_video_started</code></td>
+<td>17</td>
+<td><code>final_video</code></td>
+<td>running</td>
+</tr>
+<tr>
+<td><code>final_video_completed</code></td>
+<td>18</td>
+<td><code>final_video</code></td>
+<td>succeeded</td>
+</tr>
+<tr>
+<td><code>final_video_failed</code></td>
+<td>19</td>
+<td><code>final_video</code></td>
+<td>failed</td>
+</tr>
+</tbody>
+</table></div>
+<p>回写时会做两件事：</p>
+<ol>
+<li>清洗敏感字段，例如 token、authorization、signature。</li>
+<li>写入 SQLite artifacts，并更新 session 当前阶段。</li>
+</ol>
+<p>下一轮用户聊天时，只要带同一个 <code>session_id</code>，<code>_hydrate_request_context</code> 就会自动把这些 artifact 恢复进 context。</p>
+<p>这就把“聊天决策”和“异步生产”解耦了。Agent 负责知道现在该做什么，外部业务系统负责真正生成，完成后用 task-event 告诉 Agent。</p>
+<h2>12. 会话记忆：session + messages + artifacts</h2>
+<p>SQLite 中有三张核心表：</p>
+<ul>
+<li><code>sessions</code>：当前阶段、用户、项目、locale、状态。</li>
+<li><code>messages</code>：用户消息、assistant 文本、系统事件、turn record。</li>
+<li><code>artifacts</code>：每个阶段的结构化产物。</li>
+</ul>
+<p>artifact 以 <code>session_id + artifact_key</code> 唯一，例如：</p>
+<pre><code class="language-text">music_config
+music_result
+outline_config
+outline
+details
+asset_prompts
+assets
+storyboard
+segment_videos
+final_video
+pending_paid_confirmation
+</code></pre>
+<p>每轮请求开始时，<code>load_context</code> 会把 artifacts 放在两处：</p>
+<pre><code class="language-python">context[&quot;artifacts&quot;][&quot;outline&quot;] = {...}
+context[&quot;outline&quot;] = {...}
+</code></pre>
+<p>这样既支持新代码统一从 <code>context.artifacts</code> 读，也兼容旧节点从平铺字段读。</p>
+<p>同时它还会把最近 12 条对话恢复为 <code>recent_messages</code>，让 router 能判断用户是否正在回答上一轮追问。</p>
+<p>这个记忆层是整个多轮 Agent 的地基。没有它，模型每轮都只能看到用户最新一句，无法知道音乐是否已完成、大纲是否存在、当前能不能继续。</p>
+<h2>13. 响应打包：内部 state 和前端协议分离</h2>
+<p>内部 graph state 包含很多字段：</p>
+<pre><code class="language-text">route
+node_name
+skill_name
+expert_output
+assistant_text
+context
+error
+</code></pre>
+<p>但前端不应该直接消费这些内部结构。<code>package_response</code> 会统一压成：</p>
+<pre><code class="language-json">{
+  &quot;code&quot;: 200,
+  &quot;ok&quot;: true,
+  &quot;stage_id&quot;: 6,
+  &quot;interaction_text&quot;: &quot;...&quot;,
+  &quot;messages&quot;: [
+    {&quot;type&quot;: &quot;text&quot;, &quot;content&quot;: &quot;...&quot;},
+    {&quot;type&quot;: &quot;card&quot;, &quot;data&quot;: {&quot;stage_id&quot;: 6, &quot;...&quot;: &quot;...&quot;}}
+  ]
+}
+</code></pre>
+<p>最后 <code>_public_chat_response</code> 再压缩成对外 API 结构：</p>
+<pre><code class="language-json">{
+  &quot;code&quot;: 200,
+  &quot;msg&quot;: &quot;成功&quot;,
+  &quot;data&quot;: {
+    &quot;stage_id&quot;: 6,
+    &quot;interaction_text&quot;: &quot;...&quot;,
+    &quot;form_data&quot;: {
+      &quot;stage_id&quot;: 6,
+      &quot;title&quot;: &quot;...&quot;,
+      &quot;audioUrl&quot;: &quot;...&quot;,
+      &quot;musicDuration&quot;: 90,
+      &quot;aspectRatio&quot;: &quot;9:16&quot;,
+      &quot;language&quot;: &quot;en&quot;,
+      &quot;style&quot;: &quot;real_person&quot;,
+      &quot;introduction&quot;: &quot;...&quot;,
+      &quot;characterSettings&quot;: []
+    }
+  }
+}
+</code></pre>
+<p>打包层会按场景选择不同响应：</p>
+<ul>
+<li>音乐来源选择：返回 <code>music_source_selection</code> 卡片。</li>
+<li>缺音乐 brief：只返回追问文本。</li>
+<li>付费确认：返回 <code>paid_generation_confirmation</code> 卡片，并设置 <code>ok=false</code>。</li>
+<li>展示当前卡片：从 context 取已有 artifact，不重新生成。</li>
+<li>专家产物：返回 text + card，并生成 <code>stage_output_ready</code> 语义事件。</li>
+<li>route-only 兜底：只返回文本。</li>
+</ul>
+<p>这层让前端永远面对相对稳定的 <code>interaction_text + form_data</code>，不用理解内部 route 和节点细节。</p>
+<h2>14. 流式接口</h2>
+<p><code>/business/chat/stream</code> 使用 NDJSON 事件。它和非流式接口共用同一套路由和阶段节点，只是把结果拆成事件：</p>
+<pre><code class="language-text">route
+analysis_delta
+analysis_done
+stage_output_ready
+done
+</code></pre>
+<p>当前实现不是重新生成一份“分析过程”，而是把最终用户可见文本作为流式 lead text 输出，避免流式和非流式逻辑分叉导致答案不一致。</p>
+<p>前端可以先展示 <code>analysis_delta</code>，等 <code>stage_output_ready</code> 到达后更新右侧画布卡片，最后用 <code>done</code> 收尾。</p>
+<h2>15. Skill Prompt 和 few-shot</h2>
+<p>每个内容生成阶段都有独立 skill：</p>
+<ul>
+<li><code>mv-music-generation-skill</code></li>
+<li><code>mv-outline-skill</code></li>
+<li><code>mv-details-skill</code></li>
+<li><code>mv-asset-skill</code></li>
+<li><code>mv-storyboard-skill</code></li>
+</ul>
+<p>专家节点不会一次性加载所有技能，而是按当前 node 的 <code>skill_name</code> 加载对应 <code>SKILL.md</code>。这样有两个好处：</p>
+<ul>
+<li>Prompt 更短，模型只看当前阶段规则。</li>
+<li>职责更清晰，outline 专家不会被 details 或 storyboard 的 schema 干扰。</li>
+</ul>
+<p>few-shot 通过 <code>load_fewshot_examples</code> 读取：</p>
+<pre><code class="language-text">_fewshot/&lt;skill_name&gt;/positive.jsonl
+_fewshot/&lt;skill_name&gt;/negative.jsonl
+</code></pre>
+<p>每类最多取若干条，并过滤不支持语言的示例，避免 few-shot 把模型带到错误语言上。</p>
+<p>这里的 few-shot 不只是“好例子”，还有 negative examples。对复杂 JSON 生成来说，反例很重要：它可以提醒模型不要输出旧字段、不要语言混杂、不要改变 schema。</p>
+<h2>16. 模板检索层：从完整案例切 chunk，再按标签注入专家节点</h2>
+<p>模板检索层的核心不是“搜一段相似文本”，而是把历史完整案例拆成一组可复用 chunk。每个 chunk 都有明确用途、适用阶段、标签和内容字段。在线生成时，Agent 先把用户输入打成标签，再按当前节点选择合适的 chunk 注入给专家节点。</p>
+<p>整体链路如下：</p>
+<div class="mermaid">
+flowchart TD
+    A["完整案例 Case JSON"] --> B["离线切分器<br/>split_case_into_chunks"]
+    B --> C["TemplateChunk<br/>type / granularity / stage_scope<br/>tags / content / constraints"]
+    C --> D["模板库<br/>JSONL / SQLite / 配置表"]
+
+    E["用户输入 + 当前阶段 + 已有 artifact"] --> F["LLM Tagger<br/>输出 tag_profile"]
+    F --> G["按阶段过滤模板<br/>stage_scope + type"]
+    D --> G
+    G --> H["标签匹配打分<br/>genre / mood / style / asset / pace"]
+    H --> I["去重与冲突过滤"]
+    I --> J["Top-K Template Pack"]
+    J --> K["注入 run_expert context<br/>retrieved_templates"]
+    K --> L["专家节点生成当前 stage JSON"]
+    L --> M["validate_stage_output"]
+</div>
+
+<h3>16.1 完整案例长什么样</h3>
+<p>一个完整案例需要是结构化 JSON，而不是一篇文章。它至少包含用户 brief、音乐信息、标签、大纲、详情、资产、分镜、提示词片段和质量标注。后续切 chunk 的时候，所有模板都从这些字段里提取。</p>
+<p>简化后的案例结构如下：</p>
+<pre><code class="language-json">{
+  &quot;case_id&quot;: &quot;case_001_neon_rain_reunion&quot;,
+  &quot;source&quot;: {
+    &quot;user_brief&quot;: &quot;做一个雨夜赛博朋克风的都市爱情MV，孤独但最后有情绪爆发。&quot;,
+    &quot;music&quot;: {
+      &quot;music_description&quot;: &quot;中速都市流行，前半段克制孤独，副歌有强烈情绪释放。&quot;,
+      &quot;duration&quot;: 90,
+      &quot;lyrics_summary&quot;: &quot;雨夜、错过、寻找、重逢、释怀&quot;
+    },
+    &quot;selected_config&quot;: {
+      &quot;language&quot;: &quot;zh_tw&quot;,
+      &quot;aspectRatio&quot;: &quot;9:16&quot;,
+      &quot;style&quot;: &quot;real_person&quot;
+    }
+  },
+  &quot;tags&quot;: {
+    &quot;genre&quot;: [&quot;urban&quot;, &quot;romance&quot;, &quot;cyberpunk&quot;],
+    &quot;mood&quot;: [&quot;lonely&quot;, &quot;bittersweet&quot;, &quot;emotional_release&quot;],
+    &quot;story_type&quot;: [&quot;missed_connection&quot;, &quot;reunion&quot;],
+    &quot;visual_style&quot;: [&quot;neon_noir&quot;, &quot;rainy_city&quot;, &quot;real_person&quot;],
+    &quot;camera_style&quot;: [&quot;tracking&quot;, &quot;slow_push_in&quot;, &quot;close_up&quot;],
+    &quot;pace&quot;: &quot;medium_fast&quot;,
+    &quot;asset_type&quot;: [&quot;female_lead&quot;, &quot;male_lead&quot;, &quot;city_street&quot;, &quot;symbolic_item&quot;]
+  },
+  &quot;outline&quot;: {
+    &quot;title&quot;: &quot;雨夜重逢&quot;,
+    &quot;musicDuration&quot;: 90,
+    &quot;language&quot;: &quot;zh_tw&quot;,
+    &quot;style&quot;: &quot;real_person&quot;,
+    &quot;introduction&quot;: &quot;霓虹閃爍的雨夜，女主角在城市街頭尋找一段未完成的告別...&quot;,
+    &quot;characterSettings&quot;: []
+  },
+  &quot;details&quot;: {
+    &quot;scenes&quot;: []
+  },
+  &quot;asset_prompts&quot;: {
+    &quot;characters&quot;: [],
+    &quot;scenes&quot;: [],
+    &quot;items&quot;: []
+  },
+  &quot;storyboard&quot;: {
+    &quot;storyboard_list&quot;: []
+  },
+  &quot;prompt_patterns&quot;: {
+    &quot;positive_blocks&quot;: [],
+    &quot;negative_blocks&quot;: []
+  },
+  &quot;quality_annotations&quot;: {
+    &quot;good_for&quot;: [&quot;urban romance&quot;, &quot;neon rainy city&quot;, &quot;emotional chorus release&quot;],
+    &quot;avoid_for&quot;: [&quot;bright comedy&quot;, &quot;pastoral scenery&quot;],
+    &quot;reusable_parts&quot;: [&quot;story_arc&quot;, &quot;style_block&quot;, &quot;character_block&quot;, &quot;shot_pattern&quot;, &quot;prompt_block&quot;]
+  }
+}
+</code></pre>
+<p>这份 case 的作用不是直接喂给生成模型，而是作为“模板原料”。离线切分器会从中拆出多个 <code>TemplateChunk</code>。</p>
+<p>这些 tag 的中文含义如下：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>tag 字段</th>
+<th>中文含义</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>genre</code></td>
+<td>题材/类型，用来判断故事大方向。</td>
+<td><code>urban</code> 都市，<code>romance</code> 爱情，<code>cyberpunk</code> 赛博朋克</td>
+</tr>
+<tr>
+<td><code>mood</code></td>
+<td>情绪氛围，用来控制故事和画面的情绪。</td>
+<td><code>lonely</code> 孤独，<code>bittersweet</code> 苦甜，<code>emotional_release</code> 情绪释放</td>
+</tr>
+<tr>
+<td><code>story_type</code></td>
+<td>叙事结构，用来选择故事推进方式。</td>
+<td><code>missed_connection</code> 错过，<code>reunion</code> 重逢</td>
+</tr>
+<tr>
+<td><code>visual_style</code></td>
+<td>视觉风格，用来匹配画面、灯光和质感模板。</td>
+<td><code>neon_noir</code> 霓虹黑色电影，<code>rainy_city</code> 雨夜城市，<code>real_person</code> 真人风</td>
+</tr>
+<tr>
+<td><code>camera_style</code></td>
+<td>镜头语言，用来匹配分镜和运镜模板。</td>
+<td><code>tracking</code> 跟拍，<code>slow_push_in</code> 慢推，<code>close_up</code> 特写</td>
+</tr>
+<tr>
+<td><code>pace</code></td>
+<td>节奏，用来控制剪辑和镜头时长。</td>
+<td><code>medium_fast</code> 中快节奏</td>
+</tr>
+<tr>
+<td><code>asset_type</code></td>
+<td>资产类型，用来召回角色、场景、物品模板。</td>
+<td><code>female_lead</code> 女主，<code>city_street</code> 城市街道，<code>symbolic_item</code> 象征物</td>
+</tr>
+</tbody>
+</table></div>
+<h3>16.2 从完整案例里取哪些 chunk</h3>
+<p>一个完整案例可以拆成七类 chunk：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>chunk 类型</th>
+<th>来源字段</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>story_arc</code></td>
+<td><code>outline.introduction</code> + <code>details.scenes</code></td>
+<td>复用故事起承转合。</td>
+</tr>
+<tr>
+<td><code>emotion_curve</code></td>
+<td><code>source.music</code> + <code>details.scenes</code></td>
+<td>复用情绪推进节奏。</td>
+</tr>
+<tr>
+<td><code>style_block</code></td>
+<td><code>tags.visual_style</code> + <code>asset_prompts</code> + <code>storyboard</code></td>
+<td>复用视觉风格、色彩、光线、材质。</td>
+</tr>
+<tr>
+<td><code>character_block</code></td>
+<td><code>outline.characterSettings</code> + <code>asset_prompts.characters</code></td>
+<td>复用角色外貌、服装、性格信号、一致性约束。</td>
+</tr>
+<tr>
+<td><code>scene_block</code></td>
+<td><code>details.scenes</code> + <code>asset_prompts.scenes</code></td>
+<td>复用场景空间、环境、构图、风格约束。</td>
+</tr>
+<tr>
+<td><code>item_block</code></td>
+<td><code>asset_prompts.items</code></td>
+<td>复用关键物品和象征意义。</td>
+</tr>
+<tr>
+<td><code>shot_pattern</code></td>
+<td><code>storyboard.storyboard_list</code></td>
+<td>复用镜头组合、运镜、转场和时长节奏。</td>
+</tr>
+<tr>
+<td><code>prompt_block</code></td>
+<td><code>asset_prompts.*.image_prompt</code> + <code>storyboard.*.video_prompt</code> + <code>prompt_patterns</code></td>
+<td>复用稳定提示词片段和负向约束。</td>
+</tr>
+</tbody>
+</table></div>
+<p>例如从一个雨夜重逢案例里取下来的 <code>story_arc</code> 可以长这样：</p>
+<pre><code class="language-json">{
+  &quot;chunk_id&quot;: &quot;case_001_story_arc&quot;,
+  &quot;source_case_id&quot;: &quot;case_001_neon_rain_reunion&quot;,
+  &quot;type&quot;: &quot;narrative&quot;,
+  &quot;granularity&quot;: &quot;story_arc&quot;,
+  &quot;stage_scope&quot;: [&quot;outline&quot;, &quot;details&quot;],
+  &quot;tags&quot;: {
+    &quot;genre&quot;: [&quot;urban&quot;, &quot;romance&quot;],
+    &quot;mood&quot;: [&quot;lonely&quot;, &quot;emotional_release&quot;],
+    &quot;story_type&quot;: [&quot;missed_connection&quot;, &quot;reunion&quot;]
+  },
+  &quot;content&quot;: {
+    &quot;opening&quot;: &quot;主角在强氛围场景中独自出现，建立孤独感。&quot;,
+    &quot;conflict&quot;: &quot;旧关系被重新唤起，但现实距离阻止两人靠近。&quot;,
+    &quot;turning_point&quot;: &quot;音乐高潮处出现主动奔赴或情绪爆发。&quot;,
+    &quot;ending&quot;: &quot;结尾保留余韵，关系不完全解释。&quot;
+  },
+  &quot;constraints&quot;: {
+    &quot;max_injected_chars&quot;: 500,
+    &quot;can_combine_with&quot;: [&quot;visual&quot;, &quot;storyboard&quot;]
+  }
+}
+</code></pre>
+<p>一个角色 chunk 可以长这样：</p>
+<pre><code class="language-json">{
+  &quot;chunk_id&quot;: &quot;case_001_character_female_lead&quot;,
+  &quot;source_case_id&quot;: &quot;case_001_neon_rain_reunion&quot;,
+  &quot;type&quot;: &quot;asset&quot;,
+  &quot;granularity&quot;: &quot;character_block&quot;,
+  &quot;stage_scope&quot;: [&quot;asset&quot;, &quot;storyboard&quot;],
+  &quot;tags&quot;: {
+    &quot;asset_type&quot;: [&quot;female_lead&quot;],
+    &quot;genre&quot;: [&quot;urban&quot;, &quot;romance&quot;],
+    &quot;visual_style&quot;: [&quot;real_person&quot;, &quot;neon_noir&quot;],
+    &quot;mood&quot;: [&quot;lonely&quot;]
+  },
+  &quot;content&quot;: {
+    &quot;role&quot;: &quot;female_lead&quot;,
+    &quot;appearance&quot;: &quot;短银发，心形脸，眼神冷淡但有情绪张力。&quot;,
+    &quot;wardrobe&quot;: &quot;黑色皮外套，银色耳饰。&quot;,
+    &quot;personality_signal&quot;: &quot;疏离、敏感、情绪压抑。&quot;,
+    &quot;consistency_constraints&quot;: [
+      &quot;保持发型和脸型一致&quot;,
+      &quot;保持服装主色为黑色和银色&quot;,
+      &quot;避免不同镜头中角色气质漂移&quot;
+    ]
+  },
+  &quot;constraints&quot;: {
+    &quot;max_injected_chars&quot;: 600,
+    &quot;can_combine_with&quot;: [&quot;visual&quot;, &quot;prompt&quot;, &quot;storyboard&quot;]
+  }
+}
+</code></pre>
+<p>一个分镜 chunk 可以长这样：</p>
+<pre><code class="language-json">{
+  &quot;chunk_id&quot;: &quot;case_001_shot_chorus_release&quot;,
+  &quot;source_case_id&quot;: &quot;case_001_neon_rain_reunion&quot;,
+  &quot;type&quot;: &quot;storyboard&quot;,
+  &quot;granularity&quot;: &quot;shot_pattern&quot;,
+  &quot;stage_scope&quot;: [&quot;details&quot;, &quot;storyboard&quot;],
+  &quot;tags&quot;: {
+    &quot;pace&quot;: [&quot;medium_fast&quot;],
+    &quot;mood&quot;: [&quot;emotional_release&quot;],
+    &quot;camera_style&quot;: [&quot;tracking&quot;, &quot;slow_push_in&quot;, &quot;close_up&quot;]
+  },
+  &quot;content&quot;: {
+    &quot;pattern&quot;: [
+      &quot;wide establishing shot to reset location&quot;,
+      &quot;tracking shot following the character moving forward&quot;,
+      &quot;close-up on face at lyric accent&quot;,
+      &quot;cutaway to symbolic item&quot;,
+      &quot;slow push-in during emotional peak&quot;
+    ],
+    &quot;duration_rule&quot;: &quot;8-15 seconds per shot group&quot;,
+    &quot;transition_style&quot;: &quot;match cut or rain reflection dissolve&quot;
+  }
+}
+</code></pre>
+<h3>16.3 chunk 怎么存</h3>
+<p>每个 chunk 都用统一结构存储，便于过滤、打分、去重和注入：</p>
+<pre><code class="language-json">{
+  &quot;chunk_id&quot;: &quot;case_001_style_neon_rain&quot;,
+  &quot;source_case_id&quot;: &quot;case_001_neon_rain_reunion&quot;,
+  &quot;type&quot;: &quot;visual&quot;,
+  &quot;granularity&quot;: &quot;style_block&quot;,
+  &quot;stage_scope&quot;: [&quot;outline&quot;, &quot;asset&quot;, &quot;storyboard&quot;],
+  &quot;tags&quot;: {
+    &quot;genre&quot;: [&quot;urban&quot;, &quot;cyberpunk&quot;],
+    &quot;mood&quot;: [&quot;lonely&quot;, &quot;tense&quot;],
+    &quot;visual_style&quot;: [&quot;neon_noir&quot;, &quot;rainy_city&quot;],
+    &quot;scene&quot;: [&quot;city_street&quot;, &quot;night&quot;]
+  },
+  &quot;slots&quot;: [&quot;palette&quot;, &quot;lighting&quot;, &quot;texture&quot;, &quot;avoid&quot;],
+  &quot;content&quot;: {
+    &quot;palette&quot;: [&quot;electric blue&quot;, &quot;magenta&quot;, &quot;wet asphalt black&quot;],
+    &quot;lighting&quot;: &quot;neon reflections, backlight, rim light&quot;,
+    &quot;texture&quot;: &quot;rain mist, glossy pavement, shallow depth of field&quot;,
+    &quot;avoid&quot;: [&quot;flat daylight&quot;, &quot;clean studio look&quot;]
+  },
+  &quot;constraints&quot;: {
+    &quot;max_injected_chars&quot;: 500,
+    &quot;can_combine_with&quot;: [&quot;narrative&quot;, &quot;asset&quot;, &quot;storyboard&quot;],
+    &quot;conflicts_with&quot;: [&quot;bright_daylight&quot;, &quot;pastoral_soft&quot;]
+  }
+}
+</code></pre>
+<p>存储上可以先按类型分文件：</p>
+<pre><code class="language-text">templates/
+  narrative.jsonl
+  visual.jsonl
+  asset.jsonl
+  storyboard.jsonl
+  prompt.jsonl
+</code></pre>
+<p>每行是一个 chunk JSON。后续如果需要更强查询能力，可以把同样结构迁到 SQLite 或其他检索表里，但字段结构保持不变。</p>
+<p>标准 chunk 字段含义如下：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>chunk_id</code></td>
+<td>chunk 唯一 ID，用于召回、去重、日志追踪。</td>
+</tr>
+<tr>
+<td><code>source_case_id</code></td>
+<td>来源案例 ID，用于追溯模板从哪个完整案例切出。</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>大类：narrative、visual、asset、storyboard、prompt。</td>
+</tr>
+<tr>
+<td><code>granularity</code></td>
+<td>细粒度：story_arc、emotion_curve、style_block、character_block、scene_block、item_block、shot_pattern、prompt_block。</td>
+</tr>
+<tr>
+<td><code>stage_scope</code></td>
+<td>适用阶段，防止把不该出现的模板注入当前节点。</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>匹配用标签。</td>
+</tr>
+<tr>
+<td><code>slots</code></td>
+<td>这个 chunk 会影响哪些内容槽位。</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>真正注入给 LLM 的内容。</td>
+</tr>
+<tr>
+<td><code>constraints</code></td>
+<td>长度、冲突、组合关系等控制信息。</td>
+</tr>
+</tbody>
+</table></div>
+<h3>16.4 怎么给 chunk 打 tag</h3>
+<p>tag 有两种来源。</p>
+<p>第一种是继承案例级标签。比如完整案例已经有：</p>
+<pre><code class="language-json">{
+  &quot;genre&quot;: [&quot;urban&quot;, &quot;romance&quot;, &quot;cyberpunk&quot;],
+  &quot;mood&quot;: [&quot;lonely&quot;, &quot;emotional_release&quot;],
+  &quot;visual_style&quot;: [&quot;neon_noir&quot;, &quot;rainy_city&quot;],
+  &quot;pace&quot;: &quot;medium_fast&quot;
+}
+</code></pre>
+<p>切出来的 chunk 会继承其中和自己相关的标签。<code>story_arc</code> 继承 <code>genre / mood / story_type</code>，<code>style_block</code> 继承 <code>visual_style / mood / scene</code>，<code>shot_pattern</code> 继承 <code>pace / mood / camera_style</code>。</p>
+<p>第二种是从 chunk 内容里补充局部标签。比如角色 chunk 会额外补 <code>asset_type=female_lead</code>，场景 chunk 会补 <code>scene=city_street/rainy_night</code>，提示词 chunk 会补 <code>quality=cinematic/real_person</code>。</p>
+<p>离线切分器可以用规则 + LLM 双层处理：</p>
+<pre><code class="language-text">完整案例 tags
+  -&gt; 规则继承到 chunk
+chunk content
+  -&gt; LLM tagger 补充局部标签
+  -&gt; 标签白名单归一化
+  -&gt; 写入 chunk.tags
+</code></pre>
+<p>LLM tagger 的输出必须是固定 JSON：</p>
+<pre><code class="language-json">{
+  &quot;genre&quot;: [&quot;urban&quot;, &quot;romance&quot;],
+  &quot;mood&quot;: [&quot;lonely&quot;, &quot;emotional_release&quot;],
+  &quot;story_type&quot;: [&quot;reunion&quot;],
+  &quot;visual_style&quot;: [&quot;neon_noir&quot;, &quot;rainy_city&quot;],
+  &quot;camera_style&quot;: [&quot;tracking&quot;, &quot;close_up&quot;],
+  &quot;asset_type&quot;: [&quot;female_lead&quot;],
+  &quot;scene&quot;: [&quot;city_street&quot;, &quot;rainy_night&quot;],
+  &quot;pace&quot;: &quot;medium_fast&quot;
+}
+</code></pre>
+<p>为了避免标签发散，需要维护一份标签白名单，例如：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>tag 字段</th>
+<th>可选值</th>
+<th>中文注释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>genre</code></td>
+<td><code>urban</code>, <code>romance</code>, <code>cyberpunk</code>, <code>campus</code>, <code>fantasy</code>, <code>suspense</code></td>
+<td>题材：都市、爱情、赛博朋克、校园、奇幻、悬疑。</td>
+</tr>
+<tr>
+<td><code>mood</code></td>
+<td><code>lonely</code>, <code>dreamy</code>, <code>tense</code>, <code>healing</code>, <code>high_energy</code>, <code>emotional_release</code></td>
+<td>情绪：孤独、梦幻、紧张、治愈、高能、情绪释放。</td>
+</tr>
+<tr>
+<td><code>story_type</code></td>
+<td><code>reunion</code>, <code>missed_connection</code>, <code>escape</code>, <code>growth</code>, <code>revenge</code>, <code>confession</code></td>
+<td>叙事类型：重逢、错过、逃离、成长、复仇、告白。</td>
+</tr>
+<tr>
+<td><code>visual_style</code></td>
+<td><code>neon_noir</code>, <code>rainy_city</code>, <code>film_retro</code>, <code>bright_campus</code>, <code>dark_gothic</code>, <code>real_person</code></td>
+<td>视觉风格：霓虹黑色电影、雨夜城市、复古胶片、明亮校园、暗黑哥特、真人风。</td>
+</tr>
+<tr>
+<td><code>camera_style</code></td>
+<td><code>tracking</code>, <code>handheld</code>, <code>slow_push_in</code>, <code>close_up</code>, <code>wide_establishing</code></td>
+<td>镜头语言：跟拍、手持、慢推、特写、远景建立。</td>
+</tr>
+<tr>
+<td><code>asset_type</code></td>
+<td><code>female_lead</code>, <code>male_lead</code>, <code>city_street</code>, <code>symbolic_item</code>, <code>vehicle</code>, <code>room</code></td>
+<td>资产类型：女主、男主、城市街道、象征物、交通工具、房间。</td>
+</tr>
+<tr>
+<td><code>pace</code></td>
+<td><code>slow</code>, <code>medium</code>, <code>medium_fast</code>, <code>fast</code></td>
+<td>节奏：慢、中等、中快、快。</td>
+</tr>
+</tbody>
+</table></div>
+<h3>16.5 生成时给 LLM 输入什么</h3>
+<p>在线生成时，专家节点拿到的输入分五部分：</p>
+<pre><code class="language-text">当前节点 schema 契约
+用户最新输入
+上游 artifacts
+当前阶段 skill prompt 和 few-shot
+retrieved_templates
+</code></pre>
+<p>不同节点注入的模板类型不同：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>当前节点</th>
+<th>必给上游内容</th>
+<th>推荐模板</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>outline_generate_node</code></td>
+<td>用户需求、音乐信息、歌词、大纲配置</td>
+<td><code>story_arc</code>, <code>emotion_curve</code>, <code>style_block</code></td>
+</tr>
+<tr>
+<td><code>details_generate_node</code></td>
+<td>outline、人物设定、音乐时长、语言</td>
+<td><code>story_arc</code>, <code>emotion_curve</code>, <code>shot_pattern</code></td>
+</tr>
+<tr>
+<td><code>asset_prompt_node</code></td>
+<td>outline 角色、details 场景、语言、风格</td>
+<td><code>style_block</code>, <code>character_block</code>, <code>scene_block</code>, <code>item_block</code>, <code>prompt_block</code></td>
+</tr>
+<tr>
+<td><code>storyboard_generate_node</code></td>
+<td>details、assets、音乐时长、语言</td>
+<td><code>shot_pattern</code>, <code>style_block</code>, <code>prompt_block</code></td>
+</tr>
+<tr>
+<td><code>*_revision_node</code></td>
+<td>用户修改要求、旧 artifact、相关上游产物</td>
+<td>和修改目标相关的 chunk</td>
+</tr>
+</tbody>
+</table></div>
+<p>注入给 LLM 时，模板包可以压缩成这样：</p>
+<pre><code class="language-json">{
+  &quot;retrieved_templates&quot;: [
+    {
+      &quot;chunk_id&quot;: &quot;case_001_story_arc&quot;,
+      &quot;type&quot;: &quot;narrative&quot;,
+      &quot;granularity&quot;: &quot;story_arc&quot;,
+      &quot;match_reason&quot;: &quot;genre=urban/romance, mood=lonely, story_type=reunion&quot;,
+      &quot;content&quot;: {
+        &quot;opening&quot;: &quot;主角在强氛围场景中独自出现，建立孤独感。&quot;,
+        &quot;conflict&quot;: &quot;旧关系被重新唤起，但现实距离阻止两人靠近。&quot;,
+        &quot;turning_point&quot;: &quot;音乐高潮处出现主动奔赴或情绪爆发。&quot;,
+        &quot;ending&quot;: &quot;结尾保留余韵，关系不完全解释。&quot;
+      }
+    },
+    {
+      &quot;chunk_id&quot;: &quot;case_001_style_neon_rain&quot;,
+      &quot;type&quot;: &quot;visual&quot;,
+      &quot;granularity&quot;: &quot;style_block&quot;,
+      &quot;match_reason&quot;: &quot;visual_style=neon_noir/rainy_city&quot;,
+      &quot;content&quot;: {
+        &quot;palette&quot;: [&quot;electric blue&quot;, &quot;magenta&quot;],
+        &quot;lighting&quot;: &quot;neon reflections, rim light&quot;,
+        &quot;avoid&quot;: [&quot;flat daylight&quot;]
+      }
+    }
+  ]
+}
+</code></pre>
+<p>专家 prompt 里要明确：模板只能作为创作参考，不能改变当前节点 schema。</p>
+<pre><code class="language-text">Retrieved templates are creative references only.
+Use them to improve story structure, visual consistency, asset detail, and shot rhythm.
+Do not output chunk_id, source_case_id, tags, scores, or retrieved_templates.
+The final JSON schema is still controlled by NODE_REGISTRY.
+</code></pre>
+<h3>16.6 根据什么匹配输入</h3>
+<p>匹配分三步。</p>
+<p>第一步，按当前节点过滤：</p>
+<pre><code class="language-text">outline_generate_node    -&gt; narrative + visual
+details_generate_node    -&gt; narrative + storyboard
+asset_prompt_node        -&gt; visual + asset + prompt
+storyboard_generate_node -&gt; storyboard + visual + prompt
+revision_node            -&gt; 和修改目标相关的类型
+</code></pre>
+<p>第二步，按标签打分：</p>
+<pre><code class="language-text">score =
+  3.0 * stage_scope_match
++ 2.0 * visual_style_overlap
++ 1.5 * genre_overlap
++ 1.5 * mood_overlap
++ 1.2 * story_type_overlap
++ 1.0 * asset_type_overlap
++ 0.8 * camera_style_overlap
++ 0.5 * pace_match
+</code></pre>
+<p>第三步，做去重和冲突过滤：</p>
+<ul>
+<li>同一 <code>source_case_id</code> 不要占满全部 Top-K，避免风格过窄。</li>
+<li>同一 <code>granularity</code> 保留 1-3 个，避免模板过重。</li>
+<li><code>conflicts_with</code> 命中的 chunk 不同时注入。</li>
+<li>优先保留和上游已采用风格一致的 chunk，保证多阶段一致性。</li>
+</ul>
+<p>这样生成时的逻辑就很清晰：用户输入先打标签，标签和当前节点共同决定召回哪些 chunk，chunk 只作为专家节点的参考输入，最终输出仍然由 <code>NODE_REGISTRY</code> 和 <code>validate_stage_output</code> 控制。</p>
+<h2>17. 语言和本地化控制</h2>
+<p>系统里有两类语言：</p>
+<p>第一类是交互语言，也就是 Agent 和用户聊天用什么语言。API 会根据用户最新输入推断 locale，除非调用方显式传入 <code>locale</code>。</p>
+<p>第二类是 MV 内容语言，也就是大纲、详情、资产、分镜里的内容字段用什么语言。这个由 stage 5 的 <code>language</code> 配置决定，目前支持：</p>
+<pre><code class="language-text">en
+zh_tw
+ja
+</code></pre>
+<p><code>validate_stage_output</code> 会检查输出里的 <code>language</code> 是否属于支持范围，防止模型输出 <code>zh_cn</code>、<code>ko</code> 或自然语言标签。</p>
+<p>这层设计把“界面交互语言”和“作品内容语言”分开。用户可以用中文聊天，但选择 MV 内容语言为英文；后续内容字段仍应使用英文。</p>
+<h2>18. 为什么要把 route 字段和 card 字段隔离</h2>
+<p>这是整个系统里最容易踩坑的点。</p>
+<p>route 字段是内部调度信息：</p>
+<pre><code class="language-text">action
+accepted
+reason
+from_stage_id
+to_stage_id
+available_actions
+invalidates
+preserved_as_reference
+</code></pre>
+<p>card 字段是前端业务卡片：</p>
+<pre><code class="language-text">stage_id
+title
+audioUrl
+musicDuration
+aspectRatio
+language
+style
+introduction
+characterSettings
+</code></pre>
+<p>如果让模型在同一个 JSON 里同时输出 route 和 card，会出现几个问题：</p>
+<ul>
+<li>前端卡片 schema 被污染。</li>
+<li>session artifact 写入内部调度字段。</li>
+<li>后续节点从 artifact 读取 context 时误把 route 当业务字段。</li>
+<li>修改已有产物时，模型可能保留过期 action。</li>
+<li>调试时不知道问题来自路由还是生成。</li>
+</ul>
+<p>所以当前架构强制二者分离：</p>
+<ul>
+<li>route 只存在于 graph state 和可选调试输出。</li>
+<li>card 只存在于 <code>expert_output</code> / <code>form_data</code>。</li>
+<li><code>sanitize_expert_output</code> 删除 route 元数据。</li>
+<li><code>validate_stage_output</code> 禁止多余字段。</li>
+</ul>
+<p>这就是 JSON 控制的核心原则：模型可以参与生成内容，但不能定义协议边界。</p>
+<h2>19. 一个完整例子</h2>
+<p>假设用户从上传音乐开始：</p>
+<pre><code class="language-text">用户：我上传了这首歌，帮我做一个赛博朋克风的 MV
+请求带 url/duration/lyrics
+</code></pre>
+<p>API 会把上传音乐归一化成：</p>
+<pre><code class="language-json">{
+  &quot;stage_id&quot;: 3,
+  &quot;status&quot;: &quot;succeeded&quot;,
+  &quot;source&quot;: &quot;uploaded&quot;,
+  &quot;url&quot;: &quot;...&quot;,
+  &quot;music_url&quot;: &quot;...&quot;,
+  &quot;duration&quot;: 90,
+  &quot;music_duration&quot;: 90,
+  &quot;lyrics&quot;: &quot;...&quot;
+}
+</code></pre>
+<p>并写入 <code>music_result</code>。</p>
+<p>下一轮用户说：</p>
+<pre><code class="language-text">继续
+</code></pre>
+<p>router 根据 stage 3 的 continue transition 得到：</p>
+<pre><code class="language-json">{
+  &quot;accepted&quot;: true,
+  &quot;to_stage_id&quot;: 5,
+  &quot;action&quot;: &quot;generate_outline&quot;
+}
+</code></pre>
+<p><code>ACTION_NODE_MAP</code> 映射到：</p>
+<pre><code class="language-text">generate_outline -&gt; outline_form_node
+</code></pre>
+<p><code>outline_form_node</code> 是确定性节点，输出：</p>
+<pre><code class="language-json">{
+  &quot;stage_id&quot;: 5,
+  &quot;language&quot;: &quot;en&quot;,
+  &quot;aspectRatio&quot;: &quot;9:16&quot;,
+  &quot;style&quot;: &quot;real_person&quot;
+}
+</code></pre>
+<p>前端展示配置卡。用户确认后，API 从聊天文本抽取配置，写入 <code>outline_config</code>，router 再把“继续”映射成：</p>
+<pre><code class="language-text">generate_outline_result -&gt; outline_generate_node
+</code></pre>
+<p>这次 <code>outline_generate_node</code> 是专家节点，会加载大纲专家 skill，结合 <code>music_result</code>、<code>outline_config</code>、歌词和用户描述生成完整大纲 JSON。输出必须完全匹配：</p>
+<pre><code class="language-json">{
+  &quot;stage_id&quot;: 6,
+  &quot;title&quot;: &quot;...&quot;,
+  &quot;audioUrl&quot;: &quot;...&quot;,
+  &quot;musicDuration&quot;: 90,
+  &quot;aspectRatio&quot;: &quot;9:16&quot;,
+  &quot;language&quot;: &quot;en&quot;,
+  &quot;style&quot;: &quot;real_person&quot;,
+  &quot;introduction&quot;: &quot;...&quot;,
+  &quot;characterSettings&quot;: []
+}
+</code></pre>
+<p>校验通过后写入 <code>outline</code> artifact。后续 details、assets、storyboard 都用同样模式推进。</p>
+<h2>20. 扩展一个新阶段应该改哪里</h2>
+<p>如果要新增一个业务阶段，不建议先改 prompt。应该先明确系统契约：</p>
+<ol>
+<li>在 <code>stage_flow.py</code> 里新增 <code>StageDefinition</code>。</li>
+<li>如果它是可继续流转的一环，补 <code>CONTINUE_FLOW</code>。</li>
+<li>在 <code>ACTION_NODE_MAP</code> 里声明 action 到 node 的映射。</li>
+<li>在 <code>NODE_PREREQUISITE_SPECS</code> 里声明最早阶段和必需 artifact。</li>
+<li>在 <code>stage_nodes.py</code> 里新增 <code>StageNodeSpec</code>。</li>
+<li>如果需要 LLM，新增或复用 skill，并定义精确 schema。</li>
+<li>如果是异步任务，在 <code>TASK_EVENT_SPECS</code> 里补 event 到 artifact 的映射。</li>
+<li>在测试里覆盖 route、guard、schema、session artifact 和 task-event。</li>
+</ol>
+<p>这个顺序很重要。先定义状态和 schema，再写 prompt。否则模型可能已经会生成内容，但系统没有稳定方式接住它。</p>
+<h2>21. 这套架构的几个设计取舍</h2>
+<p>第一，短 LangGraph + 强注册表，而不是复杂图。这样业务规则更集中，修改成本更低。</p>
+<p>第二，route 和 expert 两段式，而不是一次大 prompt。这样能区分“意图判断错了”还是“内容生成错了”。</p>
+<p>第三，schema 完全匹配，而不是宽松兼容。这样可以早失败，避免脏数据进入 artifacts。</p>
+<p>第四，异步任务通过 task-event 回写，而不是聊天请求里等待。这样 Agent 不需要长期阻塞，也不会假装任务完成。</p>
+<p>第五，修改用完整卡片重写，而不是 JSON patch。这样更适合复杂业务 JSON，但必须配合 schema 校验和 judge。</p>
+<p>第六，付费动作需要确认。Agent 的自然语言理解永远可能误判，涉及成本或耗时时必须有人类确认边界。</p>
+<h2>22. 总结</h2>
+<p>这类 Agent 的关键不是“一个模型写完整 MV”，而是把模型放进一个可验证、可恢复、可调试的业务状态机里。</p>
+<p>这套架构把系统拆成几层：</p>
+<ul>
+<li>FastAPI 负责入口和上下文恢复。</li>
+<li>SQLite 负责长期会话和 artifacts。</li>
+<li>router 负责把自然语言变成 action。</li>
+<li>template retriever 负责把用户输入分发成标签，并召回匹配的创作模板。</li>
+<li>stage guard 负责守住阶段顺序。</li>
+<li>node registry 负责定义每个业务节点的 schema 契约。</li>
+<li>expert runner 负责受约束地调用 LLM。</li>
+<li>response packager 负责前端协议。</li>
+<li>task-event 负责异步任务回写。</li>
+</ul>
+<p>模型在这里不是全能控制器，而是被限制在合适位置的“阶段专家”。它可以生成大纲、详情、资产提示词和分镜，但不能随意改阶段、不能污染 route、不能改变前端 schema、不能误触发付费任务。</p>
+<p>这也是 Agent 工程化最重要的一点：不要把确定性边界交给模型。状态流转、schema 校验、任务回写、上下文恢复，都应该由代码接管；模型只在需要创造内容的地方发挥作用。</p>
+        </div>
+    </article>
+    <div id="footer-placeholder"></div>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+        mermaid.initialize({ startOnLoad: true, theme: "default", securityLevel: "loose" });
+    </script>
+    <script src="../components/load-components.js"></script>
+    <script src="https://pgh11.github.io/pgh-blog/script.js"></script>
+</body>
+</html>
